@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-surface: #ffffff;
+  --accent: #5c7cfa;
+  --accent-glow: rgba(92, 124, 250, 0.15);
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Glass morphism card */
+.glass-card {
+  @apply bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-xl;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.glass-card:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+/* Score bar colors */
+.score-high { @apply bg-emerald-500; }
+.score-medium { @apply bg-amber-500; }
+.score-low { @apply bg-red-400; }
+
+/* Keyword highlight */
+.keyword-match {
+  @apply bg-amber-200/60 text-amber-900 px-0.5 rounded font-medium;
+}
+
+/* Graph container */
+.graph-container {
+  width: 100%;
+  height: 700px;
+  border-radius: 1rem;
+  overflow: hidden;
+  position: relative;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+.graph-container canvas {
+  border-radius: 1rem;
+}
+
+/* Animated gradient background */
+.gradient-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #5c7cfa 50%, #4c6ef5 75%, #667eea 100%);
+  background-size: 300% 300%;
+  animation: gradientShift 8s ease infinite;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Score ring */
+.score-ring {
+  filter: drop-shadow(0 0 6px rgba(92, 124, 250, 0.3));
+}
+
+/* Reasoning step animation */
+.reasoning-step {
+  @apply border-l-2 border-brand-200 pl-4 py-2;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400;
+}
+
+/* Sidebar active link */
+.sidebar-link-active {
+  @apply bg-brand-600/20 text-white border-r-2 border-brand-400;
+}
+
+/* Stat card shimmer */
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}

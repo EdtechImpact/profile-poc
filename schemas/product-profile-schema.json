@@ -1,0 +1,73 @@
+{
+  "version": "1.0",
+  "entity_type": "product",
+  "fields": {
+    "primary_category": {
+      "type": "text",
+      "source": "primaryCategory",
+      "extraction": "direct"
+    },
+    "subjects": {
+      "type": "array",
+      "source": "curriculumContent",
+      "extraction": "direct"
+    },
+    "age_range": {
+      "type": "array",
+      "source": "ageRange",
+      "extraction": "direct"
+    },
+    "purchase_model": {
+      "type": "text",
+      "source": "purchaseModels",
+      "extraction": "direct"
+    },
+    "key_features": {
+      "type": "array",
+      "source": "heroFeatures",
+      "extraction": "direct"
+    },
+    "num_of_reviews": {
+      "type": "number",
+      "source": "numOfReviews",
+      "extraction": "direct"
+    },
+    "user_rating": {
+      "type": "number",
+      "source": "userRating",
+      "extraction": "direct"
+    },
+    "organisation": {
+      "type": "text",
+      "source": "organisation",
+      "extraction": "direct"
+    },
+    "pedagogy_style": {
+      "type": "text",
+      "extraction": "llm",
+      "prompt": "Based on the product description, features, and category, classify the primary pedagogy style. Examples: 'gamified learning', 'direct instruction', 'inquiry-based', 'adaptive/personalized', 'collaborative', 'drill and practice', 'project-based', 'blended learning'. Return a short phrase."
+    },
+    "target_school_type": {
+      "type": "array",
+      "extraction": "llm",
+      "prompt": "Based on the product's features, age range, subjects, and description, list the types of schools this product is best suited for. Return as a JSON array. Examples: ['primary academy', 'secondary maintained', 'special school', 'all-through', 'independent']."
+    },
+    "send_suitability": {
+      "type": "enum",
+      "values": ["not designed for SEND", "some SEND features", "SEND focused"],
+      "extraction": "llm",
+      "prompt": "Based on the product's description, features, and category, assess its suitability for Special Educational Needs and Disabilities (SEND). Return one of: 'not designed for SEND', 'some SEND features', or 'SEND focused'."
+    },
+    "value_proposition": {
+      "type": "text",
+      "extraction": "llm",
+      "prompt": "Summarize this product's core value proposition in 1-2 sentences. What problem does it solve? What makes it useful for schools? Be specific and factual based on the available data."
+    },
+    "competitive_positioning": {
+      "type": "text",
+      "extraction": "llm",
+      "prompt": "Based on the product's category, features, and any alternatives listed, describe how this product positions itself in the market in 1-2 sentences. What differentiates it?"
+    }
+  },
+  "profile_text_template": "{entity_name} by {organisation}. Category: {primary_category}. Subjects: {subjects}. Age range: {age_range}. {value_proposition} Key features: {key_features}. Pedagogy: {pedagogy_style}. Rating: {user_rating}/10 ({num_of_reviews} reviews)."
+}

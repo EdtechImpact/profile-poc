@@ -1,0 +1,86 @@
+{
+  "version": "1.0",
+  "entity_type": "school",
+  "fields": {
+    "phase": {
+      "type": "enum",
+      "values": ["primary", "secondary", "all-through", "special", "nursery", "middle", "post-16"],
+      "source": "PhaseOfEducation_name",
+      "extraction": "direct"
+    },
+    "type": {
+      "type": "enum",
+      "values": ["academy", "maintained", "free school", "independent", "special", "pupil referral unit"],
+      "source": "TypeOfEstablishment_name",
+      "extraction": "direct"
+    },
+    "size_band": {
+      "type": "enum",
+      "values": ["small", "medium", "large"],
+      "source": "NumberOfPupils",
+      "extraction": "computed",
+      "compute": "value < 200 ? 'small' : value < 600 ? 'medium' : 'large'"
+    },
+    "fsm_band": {
+      "type": "enum",
+      "values": ["low", "medium", "high"],
+      "source": "PercentageFSM",
+      "extraction": "computed",
+      "compute": "value < 15 ? 'low' : value < 35 ? 'medium' : 'high'"
+    },
+    "ofsted_rating": {
+      "type": "enum",
+      "values": ["outstanding", "good", "requires improvement", "inadequate"],
+      "source": "OfstedRating_name",
+      "extraction": "direct"
+    },
+    "urban_rural": {
+      "type": "enum",
+      "values": ["urban", "rural"],
+      "source": "UrbanRural_name",
+      "extraction": "direct"
+    },
+    "region": {
+      "type": "text",
+      "source": "GOR_name",
+      "extraction": "direct"
+    },
+    "has_sixth_form": {
+      "type": "boolean",
+      "source": "OfficialSixthForm",
+      "extraction": "direct"
+    },
+    "trust_name": {
+      "type": "text",
+      "source": "Trusts_name",
+      "extraction": "direct"
+    },
+    "number_of_pupils": {
+      "type": "number",
+      "source": "NumberOfPupils",
+      "extraction": "direct"
+    },
+    "percentage_fsm": {
+      "type": "number",
+      "source": "PercentageFSM",
+      "extraction": "direct"
+    },
+    "deprivation_level": {
+      "type": "enum",
+      "values": ["low", "medium", "high", "very high"],
+      "extraction": "llm",
+      "prompt": "Based on the FSM% (Free School Meals percentage), EAL% (English as Additional Language), and urban/rural classification, classify the overall deprivation level as 'low', 'medium', 'high', or 'very high'. Consider all factors together, not just FSM alone."
+    },
+    "school_character": {
+      "type": "text",
+      "extraction": "llm",
+      "prompt": "Write a 1-2 sentence summary of what makes this school distinctive, based on its type, size, demographics, location, trust membership, and any special characteristics. Be factual and specific."
+    },
+    "likely_tech_needs": {
+      "type": "array",
+      "extraction": "llm",
+      "prompt": "List 3-5 likely technology needs for this school based on its type, size, phase, demographics, and location. Return as a JSON array of short strings. Examples: 'SEND support tools', 'assessment platforms', 'online learning', 'behaviour management', 'parent communication'."
+    }
+  },
+  "profile_text_template": "{entity_name} is a {type} {phase} school in {region}. {school_character} It has {number_of_pupils} pupils with {fsm_band} deprivation ({percentage_fsm}% FSM). Ofsted: {ofsted_rating}. Setting: {urban_rural}."
+}
