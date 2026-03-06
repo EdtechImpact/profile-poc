@@ -25,6 +25,6 @@ export async function GET(req: NextRequest) {
       recommendations,
     });
   } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

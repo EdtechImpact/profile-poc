@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid entityType" }, { status: 400 });
   } catch (err) {
     return NextResponse.json(
-      { error: "Generation failed", details: (err as Error).message },
+      { error: "Generation failed" },
       { status: 500 }
     );
   }

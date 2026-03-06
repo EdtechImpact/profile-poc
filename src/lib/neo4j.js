@@ -157,12 +157,23 @@ export async function syncProductToGraph(profile) {
 // GRAPH QUERIES
 // ============================================================
 
+const VALID_ENTITY_TYPES = new Set(["school", "product"]);
+
+function resolveEntityLabel(entityType) {
+  if (!VALID_ENTITY_TYPES.has(entityType)) {
+    throw new Error(`Invalid entity type: ${entityType}`);
+  }
+  return entityType === "school"
+    ? { nodeLabel: "School", idField: "urn" }
+    : { nodeLabel: "Product", idField: "slug" };
+}
+
 export async function getGraphNeighbors(entityType, entityId, depth = 1) {
-  const nodeLabel = entityType === "school" ? "School" : "Product";
-  const idField = entityType === "school" ? "urn" : "slug";
+  const { nodeLabel, idField } = resolveEntityLabel(entityType);
+  const safeDepth = Math.max(1, Math.min(Math.floor(Number(depth)) || 1, 4));
 
   const records = await runCypher(
-    `MATCH (n:${nodeLabel} {${idField}: $id})-[r*1..${depth}]-(m)
+    `MATCH (n:${nodeLabel} {${idField}: $id})-[r*1..${safeDepth}]-(m)
      RETURN n, r, m
      LIMIT 100`,
     { id: entityId }
@@ -263,8 +274,7 @@ export async function getAllGraph(limit = 300) {
 }
 
 export async function findPathBetween(entityType, fromId, toId) {
-  const nodeLabel = entityType === "school" ? "School" : "Product";
-  const idField = entityType === "school" ? "urn" : "slug";
+  const { nodeLabel, idField } = resolveEntityLabel(entityType);
 
   const records = await runCypher(
     `MATCH path = shortestPath(
@@ -294,8 +304,7 @@ export async function findPathBetween(entityType, fromId, toId) {
 }
 
 export async function getNodeSimilarity(entityType, entityId, limit = 20) {
-  const nodeLabel = entityType === "school" ? "School" : "Product";
-  const idField = entityType === "school" ? "urn" : "slug";
+  const { nodeLabel, idField } = resolveEntityLabel(entityType);
 
   // Use Jaccard similarity based on shared relationships
   const records = await runCypher(
@@ -324,10 +333,9 @@ export async function getNodeSimilarity(entityType, entityId, limit = 20) {
 }
 
 export async function findCrossTypeMatches(sourceType, sourceId, limit = 50) {
-  const sourceLabel = sourceType === "school" ? "School" : "Product";
-  const targetLabel = sourceType === "school" ? "Product" : "School";
-  const sourceIdField = sourceType === "school" ? "urn" : "slug";
-  const targetIdField = sourceType === "school" ? "slug" : "urn";
+  const { nodeLabel: sourceLabel, idField: sourceIdField } = resolveEntityLabel(sourceType);
+  const targetType = sourceType === "school" ? "product" : "school";
+  const { nodeLabel: targetLabel, idField: targetIdField } = resolveEntityLabel(targetType);
 
   const records = await runCypher(
     `MATCH (s:${sourceLabel} {${sourceIdField}: $id})-[]->(shared)<-[]-(t:${targetLabel})
@@ -350,8 +358,7 @@ export async function findCrossTypeMatches(sourceType, sourceId, limit = 50) {
 export async function getCommunities(entityType) {
   // Simple community detection using connected components
   // In production, use GDS Louvain
-  const nodeLabel = entityType === "school" ? "School" : "Product";
-  const idField = entityType === "school" ? "urn" : "slug";
+  const { nodeLabel, idField } = resolveEntityLabel(entityType);
 
   const records = await runCypher(
     `MATCH (n:${nodeLabel})-[:IS_PHASE|IN_REGION|IN_TRUST|IN_CATEGORY|COVERS_SUBJECT]->(shared)<-[:IS_PHASE|IN_REGION|IN_TRUST|IN_CATEGORY|COVERS_SUBJECT]-(m:${nodeLabel})

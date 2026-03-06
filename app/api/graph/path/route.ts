@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ path });
   } catch (err) {
     return NextResponse.json(
-      { error: "Path query failed", details: (err as Error).message },
+      { error: "Path query failed" },
       { status: 500 }
     );
   }

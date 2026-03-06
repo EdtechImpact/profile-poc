@@ -13,6 +13,6 @@ export async function GET(
     const graph = await getGraphNeighbors(type, id, Math.min(depth, 3));
     return NextResponse.json(graph);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

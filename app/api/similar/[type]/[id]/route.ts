@@ -14,6 +14,6 @@ export async function GET(
     const results = await findSimilarEntities(type, id, { top, includeGraph });
     return NextResponse.json({ source: { type, id }, similar: results });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

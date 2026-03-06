@@ -9,6 +9,6 @@ export async function GET(req: NextRequest) {
     const graph = await getAllGraph(Math.min(limit, 1000));
     return NextResponse.json(graph);
   } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

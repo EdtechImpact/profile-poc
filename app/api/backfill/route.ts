@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     return NextResponse.json(
-      { error: "Backfill failed", details: (err as Error).message },
+      { error: "Backfill failed" },
       { status: 500 }
     );
   }

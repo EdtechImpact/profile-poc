@@ -18,6 +18,6 @@ export async function GET(req: NextRequest) {
     const profiles = await searchProfiles(type, q, limit);
     return NextResponse.json({ counts, profiles });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -9,6 +9,6 @@ export async function GET(req: NextRequest) {
     const communities = await getCommunities(type);
     return NextResponse.json({ communities });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

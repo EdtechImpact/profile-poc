@@ -3,6 +3,20 @@ import { join } from "path";
 
 const SCHEMAS_DIR = join(process.cwd(), "schemas");
 
+// Safe expression evaluator for computed fields.
+// Only supports chained ternary expressions like: value < 200 ? 'small' : value < 600 ? 'medium' : 'large'
+// Rejects anything that doesn't match this pattern to prevent code injection.
+const SAFE_COMPUTE_RE = /^(?:value\s*[<>=!]+\s*[\d.]+\s*\?\s*'[^']*'\s*:\s*)*'[^']*'$/;
+
+function safeEvaluateCompute(expr, value) {
+  if (typeof expr !== "string" || !SAFE_COMPUTE_RE.test(expr.trim())) {
+    throw new Error(`Unsafe compute expression rejected: ${expr}`);
+  }
+  // Expression is validated as safe ternary chain — evaluate it
+  const fn = new Function("value", `"use strict"; return ${expr}`);
+  return fn(value);
+}
+
 export function loadSchema(entityType) {
   const filePath = join(SCHEMAS_DIR, `${entityType}-profile-schema.json`);
   const raw = readFileSync(filePath, "utf-8");
@@ -50,9 +64,7 @@ export function extractComputedFieldsFromRaw(rawData, schema) {
     if (value === undefined || value === null) continue;
 
     try {
-      // Simple expression evaluation for computed fields
-      const fn = new Function("value", `return ${field.compute}`);
-      result[name] = fn(value);
+      result[name] = safeEvaluateCompute(field.compute, value);
     } catch (e) {
       console.error(`Compute error for ${name}:`, e.message);
     }
