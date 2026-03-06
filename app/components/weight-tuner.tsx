@@ -4,12 +4,14 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export interface HybridWeights {
+  [key: string]: number;
   structured: number;
   embedding: number;
   graph: number;
 }
 
 export interface DimensionWeights {
+  [key: string]: number;
   phase_age_alignment: number;
   subject_overlap: number;
   budget_fit: number;
@@ -55,7 +57,7 @@ function adjustWeights<T extends Record<string, number>>(weights: T, changedKey:
   const others = Object.keys(weights).filter((k) => k !== changedKey);
   const remaining = 1 - newVal;
   const othersSum = others.reduce((s, k) => s + weights[k], 0);
-  const result = { ...weights, [changedKey]: newVal };
+  const result = { ...weights, [changedKey]: newVal } as T;
   if (othersSum > 0) {
     for (const k of others) {
       (result as Record<string, number>)[k] = (weights[k] / othersSum) * remaining;
