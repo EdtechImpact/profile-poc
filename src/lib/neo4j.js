@@ -212,6 +212,56 @@ export async function getGraphNeighbors(entityType, entityId, depth = 1) {
   };
 }
 
+export async function getAllGraph(limit = 300) {
+  const records = await runCypher(
+    `MATCH (n)-[r]->(m)
+     RETURN n, r, m
+     LIMIT $limit`,
+    { limit: neo4j.int(limit) }
+  );
+
+  const nodes = new Map();
+  const links = [];
+
+  for (const record of records) {
+    const source = record.get("n");
+    const target = record.get("m");
+    const rel = record.get("r");
+
+    const sourceId = `${source.labels[0]}_${Object.values(source.properties)[0]}`;
+    const targetId = `${target.labels[0]}_${Object.values(target.properties)[0]}`;
+
+    if (!nodes.has(sourceId)) {
+      nodes.set(sourceId, {
+        id: sourceId,
+        label: source.properties.name || Object.values(source.properties)[0],
+        type: source.labels[0],
+        properties: source.properties,
+      });
+    }
+
+    if (!nodes.has(targetId)) {
+      nodes.set(targetId, {
+        id: targetId,
+        label: target.properties.name || Object.values(target.properties)[0],
+        type: target.labels[0],
+        properties: target.properties,
+      });
+    }
+
+    links.push({
+      source: sourceId,
+      target: targetId,
+      type: rel.type,
+    });
+  }
+
+  return {
+    nodes: Array.from(nodes.values()),
+    links,
+  };
+}
+
 export async function findPathBetween(entityType, fromId, toId) {
   const nodeLabel = entityType === "school" ? "School" : "Product";
   const idField = entityType === "school" ? "urn" : "slug";
@@ -270,6 +320,30 @@ export async function getNodeSimilarity(entityType, entityId, limit = 20) {
     entity_id: r.get("entity_id"),
     entity_name: r.get("entity_name"),
     graph_score: r.get("jaccard"),
+  }));
+}
+
+export async function findCrossTypeMatches(sourceType, sourceId, limit = 50) {
+  const sourceLabel = sourceType === "school" ? "School" : "Product";
+  const targetLabel = sourceType === "school" ? "Product" : "School";
+  const sourceIdField = sourceType === "school" ? "urn" : "slug";
+  const targetIdField = sourceType === "school" ? "slug" : "urn";
+
+  const records = await runCypher(
+    `MATCH (s:${sourceLabel} {${sourceIdField}: $id})-[]->(shared)<-[]-(t:${targetLabel})
+     WITH t, count(shared) AS shared_count, collect(shared.name) AS shared_nodes
+     RETURN t.${targetIdField} AS entity_id, t.name AS entity_name,
+            toFloat(shared_count) / 5.0 AS graph_score, shared_nodes
+     ORDER BY shared_count DESC
+     LIMIT $limit`,
+    { id: sourceId, limit: neo4j.int(limit) }
+  );
+
+  return records.map((r) => ({
+    entity_id: r.get("entity_id"),
+    entity_name: r.get("entity_name"),
+    graph_score: Math.min(r.get("graph_score"), 1.0),
+    shared_nodes: r.get("shared_nodes"),
   }));
 }
 

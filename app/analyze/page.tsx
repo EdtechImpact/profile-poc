@@ -2,6 +2,8 @@
 
 import { Suspense, useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import EntitySearchSelect from "../components/entity-search";
+import { useAWSCredentials } from "../components/aws-credentials-provider";
 
 interface ReasoningStep {
   type: "thinking" | "tool_call" | "tool_result";
@@ -23,17 +25,29 @@ export default function AnalyzePageWrapper() {
 
 function AnalyzePage() {
   const searchParams = useSearchParams();
+  const { getHeaders, isConfigured, setShowSettings } = useAWSCredentials();
   const initialType = searchParams.get("type") || "";
   const initialId = searchParams.get("id") || "";
 
   const [entityType, setEntityType] = useState(initialType || "school");
   const [entityId, setEntityId] = useState(initialId);
+  const [entityName, setEntityName] = useState("");
   const [query, setQuery] = useState("");
   const [analysis, setAnalysis] = useState("");
   const [steps, setSteps] = useState<ReasoningStep[]>([]);
   const [loading, setLoading] = useState(false);
   const [showReasoning, setShowReasoning] = useState(true);
   const resultRef = useRef<HTMLDivElement>(null);
+
+  // Fetch entity name if we have an initial ID from URL
+  useEffect(() => {
+    if (initialType && initialId) {
+      fetch(`/api/profiles/${initialType}/${initialId}`)
+        .then((r) => r.json())
+        .then((data) => { if (data.profile) setEntityName(data.profile.entity_name); })
+        .catch(() => {});
+    }
+  }, [initialType, initialId]);
 
   // Auto-generate query from params
   useEffect(() => {
@@ -46,6 +60,10 @@ function AnalyzePage() {
 
   const runAnalysis = async () => {
     if (!query.trim()) return;
+    if (!isConfigured) {
+      setShowSettings(true);
+      return;
+    }
     setLoading(true);
     setAnalysis("");
     setSteps([]);
@@ -53,7 +71,7 @@ function AnalyzePage() {
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getHeaders() },
         body: JSON.stringify({
           query,
           entityType: entityId ? entityType : undefined,
@@ -103,17 +121,18 @@ function AnalyzePage() {
   ];
 
   return (
-    <div className="max-w-5xl mx-auto animate-fade-in">
+    <div className="max-w-5xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-8 animate-fade-in-down">
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center">
+          <div className="w-11 h-11 rounded-xl gradient-bg flex items-center justify-center shadow-glow-brand relative">
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
             </svg>
+            <div className="absolute inset-0 rounded-xl gradient-bg animate-ping opacity-15" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">AI Deep Analysis</h1>
+            <h1 className="text-2xl font-extrabold text-slate-800">AI Deep Analysis</h1>
             <p className="text-slate-500 text-sm">
               Claude-powered reasoning to explore matching patterns and insights
             </p>
@@ -122,14 +141,14 @@ function AnalyzePage() {
       </div>
 
       {/* Entity context (optional) */}
-      <div className="glass-card p-5 mb-5">
+      <div className="glass-card p-5 mb-5 overflow-visible relative z-20 animate-fade-in-up" style={{ animationDelay: "0.1s", animationFillMode: "both" }}>
         <div className="flex gap-3 items-end mb-4">
           <div>
             <label className="text-xs text-slate-500 block mb-1.5 font-medium">Entity Type</label>
             <select
               value={entityType}
               onChange={(e) => setEntityType(e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white/80 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition-all cursor-pointer"
             >
               <option value="school">School</option>
               <option value="product">Product</option>
@@ -137,14 +156,15 @@ function AnalyzePage() {
           </div>
           <div className="flex-1">
             <label className="text-xs text-slate-500 block mb-1.5 font-medium">
-              Entity ID (optional - focus analysis on specific entity)
+              Entity (optional - focus analysis on specific entity)
             </label>
-            <input
-              type="text"
-              value={entityId}
-              onChange={(e) => setEntityId(e.target.value)}
-              placeholder={entityType === "school" ? "e.g. 100000" : "e.g. product-slug"}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+            <EntitySearchSelect
+              entityType={entityType}
+              onSelect={(id, name) => { setEntityId(id); setEntityName(name); }}
+              placeholder={`Search ${entityType}s by name...`}
+              selectedId={entityId}
+              selectedName={entityName}
+              onClear={() => { setEntityId(""); setEntityName(""); }}
             />
           </div>
         </div>
@@ -157,7 +177,7 @@ function AnalyzePage() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ask Claude to analyze matching patterns, explain similarities, explore graph relationships..."
             rows={3}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30 resize-none"
+            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white/80 focus:outline-none focus:ring-2 focus:ring-brand-500/30 resize-none transition-all"
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) runAnalysis();
             }}
@@ -170,7 +190,7 @@ function AnalyzePage() {
             <button
               key={i}
               onClick={() => setQuery(preset.query)}
-              className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+              className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-brand-50 hover:text-brand-700 hover:border-brand-200 transition-all duration-200"
             >
               {preset.label}
             </button>
@@ -180,7 +200,7 @@ function AnalyzePage() {
         <button
           onClick={runAnalysis}
           disabled={loading || !query.trim()}
-          className="w-full px-5 py-3 bg-brand-600 text-white rounded-xl text-sm font-semibold hover:bg-brand-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+          className="w-full px-5 py-3 gradient-bg text-white rounded-xl text-sm font-semibold hover:shadow-glow-brand disabled:opacity-50 transition-all flex items-center justify-center gap-2"
         >
           {loading ? (
             <>
@@ -201,16 +221,17 @@ function AnalyzePage() {
       {/* Results */}
       <div ref={resultRef}>
         {(loading || steps.length > 0) && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up" style={{ animationDelay: "0.15s", animationFillMode: "both" }}>
             {/* Reasoning Steps - Left Column */}
             <div className="lg:col-span-1">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand-400" />
                   Reasoning Trace
                 </h2>
                 <button
                   onClick={() => setShowReasoning(!showReasoning)}
-                  className="text-xs text-slate-400 hover:text-slate-600"
+                  className="text-xs text-slate-400 hover:text-slate-600 transition-colors px-2 py-0.5 rounded-lg hover:bg-slate-100"
                 >
                   {showReasoning ? "Hide" : "Show"}
                 </button>
@@ -224,11 +245,11 @@ function AnalyzePage() {
                       <div
                         key={i}
                         className="glass-card p-3 animate-slide-up"
-                        style={{ animationDelay: `${i * 0.1}s` }}
+                        style={{ animationDelay: `${i * 0.1}s`, animationFillMode: "both" }}
                       >
                         {step.type === "tool_call" && (
                           <div className="flex items-start gap-2">
-                            <div className="w-5 h-5 rounded-md bg-brand-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <div className="w-6 h-6 rounded-lg bg-brand-100 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
                               <svg className="w-3 h-3 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17l-5.384-3.19m0 0a2.003 2.003 0 00-2.573 0L1.5 13.5m5.963-1.52L3.001 6.94m8.419 8.23l5.384-3.19m0 0a2.003 2.003 0 012.573 0L21.5 13.5m-5.963-1.52L19.999 6.94" />
                               </svg>
@@ -237,7 +258,7 @@ function AnalyzePage() {
                               <div className="text-[11px] font-semibold text-brand-700">
                                 {formatToolName(step.tool || "")}
                               </div>
-                              <div className="text-[10px] text-slate-400 mt-0.5">
+                              <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
                                 {formatToolInput(step.input || {})}
                               </div>
                             </div>
@@ -245,7 +266,7 @@ function AnalyzePage() {
                         )}
                         {step.type === "tool_result" && (
                           <div className="flex items-start gap-2">
-                            <div className="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <div className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
                               <svg className="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                               </svg>
@@ -261,7 +282,7 @@ function AnalyzePage() {
                     ))}
 
                   {loading && (
-                    <div className="glass-card p-3 flex items-center gap-2">
+                    <div className="glass-card p-3 flex items-center gap-2 animate-pulse-soft">
                       <div className="w-4 h-4 border-2 border-brand-300 border-t-brand-600 rounded-full animate-spin" />
                       <span className="text-xs text-slate-500">Reasoning...</span>
                     </div>
@@ -272,20 +293,22 @@ function AnalyzePage() {
 
             {/* Analysis Result - Right Column */}
             <div className="lg:col-span-2">
-              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 Analysis Result
               </h2>
               {analysis ? (
-                <div className="glass-card p-6">
+                <div className="glass-card p-6 animate-fade-in-up prose-analysis">
                   <MarkdownRenderer content={analysis} />
                 </div>
               ) : loading ? (
                 <div className="glass-card p-6">
-                  <div className="space-y-3 animate-pulse">
-                    <div className="h-4 bg-slate-100 rounded w-3/4" />
-                    <div className="h-4 bg-slate-100 rounded w-full" />
-                    <div className="h-4 bg-slate-100 rounded w-5/6" />
-                    <div className="h-4 bg-slate-100 rounded w-2/3" />
+                  <div className="space-y-3">
+                    <div className="h-4 bg-slate-100 rounded-lg w-3/4 animate-pulse" />
+                    <div className="h-4 bg-slate-100 rounded-lg w-full animate-pulse" style={{ animationDelay: "0.1s" }} />
+                    <div className="h-4 bg-slate-100 rounded-lg w-5/6 animate-pulse" style={{ animationDelay: "0.2s" }} />
+                    <div className="h-4 bg-slate-100 rounded-lg w-2/3 animate-pulse" style={{ animationDelay: "0.3s" }} />
+                    <div className="h-3 bg-slate-50 rounded-lg w-1/2 animate-pulse" style={{ animationDelay: "0.4s" }} />
                   </div>
                 </div>
               ) : null}
@@ -322,19 +345,21 @@ function MarkdownRenderer({ content }: { content: string }) {
     // Headers
     if (line.startsWith("### ")) {
       elements.push(
-        <h3 key={i} className="text-base font-semibold text-slate-800 mt-5 mb-2 first:mt-0">
+        <h3 key={i} className="text-base font-semibold text-slate-800 mt-5 mb-2 first:mt-0 flex items-center gap-2">
+          <div className="w-1 h-4 rounded-full bg-brand-400" />
           {renderInline(line.slice(4))}
         </h3>
       );
     } else if (line.startsWith("## ")) {
       elements.push(
-        <h2 key={i} className="text-lg font-bold text-slate-800 mt-6 mb-2 first:mt-0">
+        <h2 key={i} className="text-lg font-bold text-slate-800 mt-6 mb-2 first:mt-0 flex items-center gap-2">
+          <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-brand-400 to-brand-600" />
           {renderInline(line.slice(3))}
         </h2>
       );
     } else if (line.startsWith("# ")) {
       elements.push(
-        <h1 key={i} className="text-xl font-bold text-slate-800 mt-6 mb-3 first:mt-0">
+        <h1 key={i} className="text-xl font-extrabold text-slate-800 mt-6 mb-3 first:mt-0">
           {renderInline(line.slice(2))}
         </h1>
       );
@@ -355,7 +380,7 @@ function MarkdownRenderer({ content }: { content: string }) {
       if (match) {
         elements.push(
           <div key={i} className="flex gap-2 my-1" style={{ paddingLeft: `${(match[1]?.length || 0) * 8}px` }}>
-            <span className="text-brand-500 font-semibold text-sm flex-shrink-0 w-5">{match[2]}.</span>
+            <span className="text-brand-500 font-bold text-sm flex-shrink-0 w-5 text-right">{match[2]}.</span>
             <span className="text-sm text-slate-700 leading-relaxed">{renderInline(match[3])}</span>
           </div>
         );
@@ -367,7 +392,7 @@ function MarkdownRenderer({ content }: { content: string }) {
     }
     // Horizontal rules
     else if (line.match(/^---+$/)) {
-      elements.push(<hr key={i} className="border-slate-200 my-4" />);
+      elements.push(<hr key={i} className="border-slate-200/60 my-4" />);
     }
     // Regular paragraphs
     else {
@@ -415,7 +440,7 @@ function renderInline(text: string): React.ReactNode {
     } else if (match[4]) {
       // Code / keyword highlight
       parts.push(
-        <code key={match.index} className="px-1.5 py-0.5 bg-brand-50 text-brand-700 rounded text-xs font-mono font-medium">
+        <code key={match.index} className="px-1.5 py-0.5 bg-brand-50 text-brand-700 rounded-md text-xs font-mono font-medium border border-brand-100/50">
           {match[4]}
         </code>
       );

@@ -33,19 +33,23 @@ export default function SchoolDetailPage({
   const { urn } = use(params);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [similar, setSimilar] = useState<SimilarEntity[]>([]);
+  const [recommendations, setRecommendations] = useState<Array<{ entity_id: string; entity_name: string; match_score: number; structured_fields: Record<string, any> }>>([]);  // eslint-disable-line @typescript-eslint/no-explicit-any
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [profileRes, similarRes] = await Promise.all([
+        const [profileRes, similarRes, recsRes] = await Promise.all([
           fetch(`/api/profiles/school/${urn}`),
           fetch(`/api/similar/school/${urn}?top=10`),
+          fetch(`/api/match/recommend?type=school&id=${urn}&top=5`),
         ]);
         const profileData = await profileRes.json();
         const similarData = await similarRes.json();
+        const recsData = await recsRes.json();
         setProfile(profileData.profile || null);
         setSimilar(similarData.similar || []);
+        setRecommendations(recsData.recommendations || []);
       } catch {
         setProfile(null);
       } finally {
@@ -93,9 +97,9 @@ export default function SchoolDetailPage({
   const sf = profile.structured_fields as Record<string, string | string[]>;
 
   return (
-    <div className="max-w-7xl mx-auto animate-fade-in">
+    <div className="max-w-7xl mx-auto">
       {/* Breadcrumb */}
-      <div className="text-sm text-slate-400 mb-4 flex items-center gap-1.5">
+      <div className="text-sm text-slate-400 mb-4 flex items-center gap-1.5 animate-fade-in">
         <Link href="/schools" className="hover:text-brand-600 transition-colors">Schools</Link>
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -104,12 +108,14 @@ export default function SchoolDetailPage({
       </div>
 
       {/* Profile header */}
-      <div className="glass-card p-6 mb-6">
-        <div className="flex items-start justify-between">
+      <div className="glass-card p-6 mb-6 animate-fade-in-up relative overflow-hidden">
+        {/* Decorative gradient */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-brand-500/5 to-transparent rounded-full -translate-y-1/2 translate-x-1/3" />
+        <div className="relative flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">{profile.entity_name}</h1>
+            <h1 className="text-2xl font-extrabold text-slate-800">{profile.entity_name}</h1>
             <div className="flex gap-2 mt-3 flex-wrap">
-              <span className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold border border-blue-100">
+              <span className="px-2.5 py-1 bg-brand-50 text-brand-700 rounded-lg text-xs font-semibold border border-brand-100 shadow-sm">
                 URN: {profile.entity_id}
               </span>
               {sf.phase && (
@@ -128,19 +134,19 @@ export default function SchoolDetailPage({
           <div className="flex gap-2">
             <Link
               href={`/analyze?type=school&id=${urn}`}
-              className="px-3 py-1.5 text-sm bg-brand-50 text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors font-medium"
+              className="px-3 py-1.5 text-sm bg-brand-50 text-brand-700 border border-brand-200 rounded-xl hover:bg-brand-100 hover:shadow-sm transition-all font-medium"
             >
               AI Analysis
             </Link>
             <Link
               href={`/graph?type=school&id=${urn}`}
-              className="px-3 py-1.5 text-sm bg-purple-50 text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors font-medium"
+              className="px-3 py-1.5 text-sm bg-purple-50 text-purple-700 border border-purple-200 rounded-xl hover:bg-purple-100 hover:shadow-sm transition-all font-medium"
             >
               3D Graph
             </Link>
             <Link
               href={`/compare?type=school&ids=${urn}`}
-              className="px-3 py-1.5 text-sm bg-slate-50 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors font-medium"
+              className="px-3 py-1.5 text-sm bg-slate-50 text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-100 hover:shadow-sm transition-all font-medium"
             >
               Compare
             </Link>
@@ -153,30 +159,35 @@ export default function SchoolDetailPage({
         <div className="lg:col-span-2 space-y-5">
           {/* LLM Summary */}
           {profile.profile_text && (
-            <div className="glass-card p-6">
-              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            <div className="glass-card p-6 animate-fade-in-up" style={{ animationDelay: "0.1s", animationFillMode: "both" }}>
+              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-brand-400" />
                 Profile Summary
               </h2>
-              <p className="text-slate-700 leading-relaxed">
+              <p className="text-slate-700 leading-relaxed text-sm">
                 <HighlightedText text={profile.profile_text} keywords={keywords} />
               </p>
             </div>
           )}
 
           {/* Structured Fields */}
-          <div className="glass-card p-6">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+          <div className="glass-card p-6 animate-fade-in-up" style={{ animationDelay: "0.15s", animationFillMode: "both" }}>
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
               Profile Fields
             </h2>
             <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-              {Object.entries(sf).map(([key, value]) => (
-                <div key={key} className="flex justify-between items-baseline py-1 border-b border-slate-50">
+              {Object.entries(sf).map(([key, value], i) => (
+                <div
+                  key={key}
+                  className="flex justify-between items-baseline py-1.5 border-b border-slate-100/60 hover:bg-slate-50/50 rounded px-1 -mx-1 transition-colors"
+                >
                   <span className="text-slate-400 text-xs capitalize">{key.replace(/_/g, " ")}</span>
                   <span className="text-slate-800 font-medium text-right text-xs">
                     {Array.isArray(value) ? (
                       <span className="flex flex-wrap gap-1 justify-end">
                         {value.map((v, i) => (
-                          <span key={i} className="px-1.5 py-0.5 bg-brand-50 text-brand-700 rounded text-[11px]">{v}</span>
+                          <span key={i} className="px-1.5 py-0.5 bg-brand-50 text-brand-700 rounded-md text-[11px] border border-brand-100/50">{v}</span>
                         ))}
                       </span>
                     ) : (
@@ -189,7 +200,7 @@ export default function SchoolDetailPage({
           </div>
 
           {/* Metadata */}
-          <div className="glass-card p-3 text-[11px] text-slate-400 flex items-center gap-2">
+          <div className="glass-card-static p-3 text-[11px] text-slate-400 flex items-center gap-2 animate-fade-in" style={{ animationDelay: "0.2s", animationFillMode: "both" }}>
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -199,7 +210,8 @@ export default function SchoolDetailPage({
 
         {/* Right: Similar schools */}
         <div className="space-y-4">
-          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
             Similar Schools
           </h2>
           {similar.length === 0 ? (
@@ -216,6 +228,45 @@ export default function SchoolDetailPage({
                 sourceFields={profile.structured_fields}
               />
             ))
+          )}
+
+          {/* Recommended Products */}
+          {recommendations.length > 0 && (
+            <>
+              <div className="flex items-center justify-between mt-6">
+                <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                  Recommended Products
+                </h2>
+                <Link href={`/match?type=school&id=${urn}`} className="text-[10px] text-brand-500 hover:text-brand-700 font-medium">
+                  View all
+                </Link>
+              </div>
+              {recommendations.map((rec, i) => {
+                const score = Math.round(rec.match_score * 100);
+                const sf = rec.structured_fields || {};
+                return (
+                  <div key={rec.entity_id} className="glass-card p-3 animate-slide-up group hover:border-rose-200/50 transition-all" style={{ animationDelay: `${(similar.length + i) * 0.06}s`, animationFillMode: "both" }}>
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold ${score >= 60 ? "bg-emerald-50 text-emerald-600" : score >= 40 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-500"}`}>
+                        {score}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <Link href={`/products/${rec.entity_id}`} className="text-xs font-semibold text-slate-800 hover:text-brand-600 transition-colors truncate block">
+                          {rec.entity_name}
+                        </Link>
+                        <div className="flex gap-1 mt-0.5">
+                          {sf.primary_category && <span className="text-[9px] px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded">{sf.primary_category}</span>}
+                          {(sf.subjects || []).slice(0, 2).map((s: string) => (
+                            <span key={s} className="text-[9px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded">{s}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       </div>
@@ -239,6 +290,8 @@ function SimilarCard({
     score >= 75 ? "text-emerald-500" : score >= 50 ? "text-amber-500" : "text-red-400";
   const ringColor =
     score >= 75 ? "stroke-emerald-500" : score >= 50 ? "stroke-amber-500" : "stroke-red-400";
+  const glowColor =
+    score >= 75 ? "shadow-glow-emerald" : score >= 50 ? "" : "";
 
   // Find matching keywords between source and similar entity
   const matchingFields: string[] = [];
@@ -251,11 +304,11 @@ function SimilarCard({
   if (sf.trust_name && sf.trust_name === sourceFields.trust_name) matchingFields.push(`trust: ${sf.trust_name}`);
 
   return (
-    <div className="glass-card p-4 animate-slide-up" style={{ animationDelay: `${rank * 0.05}s` }}>
+    <div className={`glass-card p-4 animate-slide-up group hover:border-brand-200/50 transition-all duration-300 ${glowColor}`} style={{ animationDelay: `${rank * 0.06}s`, animationFillMode: "both" }}>
       <div className="flex items-start gap-3">
         {/* Score ring */}
         <div className="relative flex-shrink-0">
-          <svg className="w-12 h-12 score-ring" viewBox="0 0 36 36">
+          <svg className="w-12 h-12 score-ring score-ring-animated" viewBox="0 0 36 36">
             <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e2e8f0" strokeWidth="2.5" />
             <circle
               cx="18" cy="18" r="15.5" fill="none"
@@ -273,22 +326,22 @@ function SimilarCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-slate-400 font-mono">#{rank}</span>
+            <span className="text-[10px] text-slate-400 font-mono bg-slate-100 px-1.5 py-0.5 rounded">#{rank}</span>
             <Link
               href={`/schools/${item.entity_id}`}
-              className="text-sm font-medium text-slate-800 hover:text-brand-600 transition-colors truncate"
+              className="text-sm font-semibold text-slate-800 hover:text-brand-600 transition-colors truncate"
             >
               {item.entity_name}
             </Link>
           </div>
 
           {/* Score breakdown mini bar */}
-          <div className="flex h-1.5 rounded-full overflow-hidden mt-2 gap-px">
-            <div className="bg-blue-400 rounded-l-full" style={{ width: `${(item.structured_score / (item.structured_score + item.embedding_score + (item.graph_score || 0))) * 100}%` }}
+          <div className="flex h-1.5 rounded-full overflow-hidden mt-2 gap-px bg-slate-100">
+            <div className="bg-blue-400 rounded-l-full transition-all duration-700" style={{ width: `${(item.structured_score / (item.structured_score + item.embedding_score + (item.graph_score || 0))) * 100}%` }}
               title={`Structured: ${Math.round(item.structured_score * 100)}%`} />
-            <div className="bg-emerald-400" style={{ width: `${(item.embedding_score / (item.structured_score + item.embedding_score + (item.graph_score || 0))) * 100}%` }}
+            <div className="bg-emerald-400 transition-all duration-700" style={{ width: `${(item.embedding_score / (item.structured_score + item.embedding_score + (item.graph_score || 0))) * 100}%` }}
               title={`Embedding: ${Math.round(item.embedding_score * 100)}%`} />
-            <div className="bg-purple-400 rounded-r-full" style={{ width: `${((item.graph_score || 0) / (item.structured_score + item.embedding_score + (item.graph_score || 0))) * 100}%` }}
+            <div className="bg-purple-400 rounded-r-full transition-all duration-700" style={{ width: `${((item.graph_score || 0) / (item.structured_score + item.embedding_score + (item.graph_score || 0))) * 100}%` }}
               title={`Graph: ${Math.round((item.graph_score || 0) * 100)}%`} />
           </div>
           <div className="flex gap-2 mt-1 text-[10px] text-slate-400">
@@ -312,16 +365,16 @@ function SimilarCard({
             <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">{item.explanation}</p>
           )}
 
-          <div className="flex gap-3 mt-2">
+          <div className="flex gap-3 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <Link
               href={`/compare?type=school&ids=${currentUrn},${item.entity_id}`}
-              className="text-[11px] text-slate-400 hover:text-brand-600 transition-colors"
+              className="text-[11px] text-brand-500 hover:text-brand-700 transition-colors font-medium"
             >
               Compare
             </Link>
             <Link
               href={`/analyze?type=school&id=${item.entity_id}`}
-              className="text-[11px] text-slate-400 hover:text-brand-600 transition-colors"
+              className="text-[11px] text-brand-500 hover:text-brand-700 transition-colors font-medium"
             >
               AI Analysis
             </Link>
@@ -356,10 +409,10 @@ function HighlightedText({ text, keywords }: { text: string; keywords: string[] 
 
 function OfstedBadge({ rating }: { rating: string }) {
   const colors: Record<string, string> = {
-    Outstanding: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    Good: "bg-blue-50 text-blue-700 border-blue-200",
-    "Requires Improvement": "bg-amber-50 text-amber-700 border-amber-200",
-    Inadequate: "bg-red-50 text-red-700 border-red-200",
+    Outstanding: "bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm shadow-emerald-100",
+    Good: "bg-blue-50 text-blue-700 border-blue-200 shadow-sm shadow-blue-100",
+    "Requires Improvement": "bg-amber-50 text-amber-700 border-amber-200 shadow-sm shadow-amber-100",
+    Inadequate: "bg-red-50 text-red-700 border-red-200 shadow-sm shadow-red-100",
   };
   return (
     <span

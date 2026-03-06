@@ -97,6 +97,20 @@ export async function findSimilarByEmbedding(entityType, embedding, limit = 50) 
   return result.rows;
 }
 
+export async function findCrossTypeByEmbedding(targetType, embedding, limit = 50) {
+  const embeddingStr = `[${embedding.join(",")}]`;
+  const result = await query(
+    `SELECT id, entity_type, entity_id, entity_name, structured_fields, profile_text,
+            1 - (profile_embedding <=> $1::vector) AS embedding_similarity
+     FROM entity_profiles
+     WHERE entity_type = $2 AND profile_embedding IS NOT NULL
+     ORDER BY profile_embedding <=> $1::vector
+     LIMIT $3`,
+    [embeddingStr, targetType, limit]
+  );
+  return result.rows;
+}
+
 export async function getAllProfiles(entityType) {
   const result = await query(
     "SELECT * FROM entity_profiles WHERE entity_type = $1 ORDER BY entity_name",

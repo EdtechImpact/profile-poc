@@ -5,13 +5,13 @@
     "phase": {
       "type": "enum",
       "values": ["primary", "secondary", "all-through", "special", "nursery", "middle", "post-16"],
-      "source": "PhaseOfEducation_name",
+      "source": "PhaseOfEducation (name)",
       "extraction": "direct"
     },
     "type": {
       "type": "enum",
       "values": ["academy", "maintained", "free school", "independent", "special", "pupil referral unit"],
-      "source": "TypeOfEstablishment_name",
+      "source": "TypeOfEstablishment (name)",
       "extraction": "direct"
     },
     "size_band": {
@@ -31,28 +31,28 @@
     "ofsted_rating": {
       "type": "enum",
       "values": ["outstanding", "good", "requires improvement", "inadequate"],
-      "source": "OfstedRating_name",
+      "source": "OfstedRating (name)",
       "extraction": "direct"
     },
     "urban_rural": {
       "type": "enum",
       "values": ["urban", "rural"],
-      "source": "UrbanRural_name",
+      "source": "UrbanRural (name)",
       "extraction": "direct"
     },
     "region": {
       "type": "text",
-      "source": "GOR_name",
+      "source": "GOR (name)",
       "extraction": "direct"
     },
     "has_sixth_form": {
       "type": "boolean",
-      "source": "OfficialSixthForm",
+      "source": "OfficialSixthForm (name)",
       "extraction": "direct"
     },
     "trust_name": {
       "type": "text",
-      "source": "Trusts_name",
+      "source": "Trusts (name)",
       "extraction": "direct"
     },
     "number_of_pupils": {

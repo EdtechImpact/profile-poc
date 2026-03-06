@@ -35,19 +35,23 @@ export default function ProductDetailPage({
   const { slug } = use(params);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [similar, setSimilar] = useState<SimilarEntity[]>([]);
+  const [recommendations, setRecommendations] = useState<Array<{ entity_id: string; entity_name: string; match_score: number; structured_fields: Record<string, any> }>>([]);  // eslint-disable-line @typescript-eslint/no-explicit-any
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [profileRes, similarRes] = await Promise.all([
+        const [profileRes, similarRes, recsRes] = await Promise.all([
           fetch(`/api/profiles/product/${slug}`),
           fetch(`/api/similar/product/${slug}?top=10`),
+          fetch(`/api/match/recommend?type=product&id=${slug}&top=5`),
         ]);
         const profileData = await profileRes.json();
         const similarData = await similarRes.json();
+        const recsData = await recsRes.json();
         setProfile(profileData.profile || null);
         setSimilar(similarData.similar || []);
+        setRecommendations(recsData.recommendations || []);
       } catch {
         setProfile(null);
       } finally {
@@ -92,9 +96,9 @@ export default function ProductDetailPage({
   const sf = profile.structured_fields as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   return (
-    <div className="max-w-7xl mx-auto animate-fade-in">
+    <div className="max-w-7xl mx-auto">
       {/* Breadcrumb */}
-      <div className="text-sm text-slate-400 mb-4 flex items-center gap-1.5">
+      <div className="text-sm text-slate-400 mb-4 flex items-center gap-1.5 animate-fade-in">
         <Link href="/products" className="hover:text-emerald-600 transition-colors">Products</Link>
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -103,13 +107,15 @@ export default function ProductDetailPage({
       </div>
 
       {/* Profile header */}
-      <div className="glass-card p-6 mb-6">
-        <div className="flex items-start justify-between">
+      <div className="glass-card p-6 mb-6 animate-fade-in-up relative overflow-hidden">
+        {/* Decorative gradient */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-emerald-500/5 to-transparent rounded-full -translate-y-1/2 translate-x-1/3" />
+        <div className="relative flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">{profile.entity_name}</h1>
+            <h1 className="text-2xl font-extrabold text-slate-800">{profile.entity_name}</h1>
             <div className="flex gap-2 mt-3 flex-wrap">
               {sf.primary_category && (
-                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-semibold border border-emerald-100">
+                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-semibold border border-emerald-100 shadow-sm">
                   {sf.primary_category as string}
                 </span>
               )}
@@ -124,8 +130,11 @@ export default function ProductDetailPage({
                 </span>
               )}
               {sf.user_rating && (
-                <span className="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold border border-amber-100">
-                  Rating: {sf.user_rating}
+                <span className="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold border border-amber-100 shadow-sm flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                  {sf.user_rating}
                 </span>
               )}
             </div>
@@ -133,19 +142,19 @@ export default function ProductDetailPage({
           <div className="flex gap-2">
             <Link
               href={`/analyze?type=product&id=${slug}`}
-              className="px-3 py-1.5 text-sm bg-brand-50 text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors font-medium"
+              className="px-3 py-1.5 text-sm bg-brand-50 text-brand-700 border border-brand-200 rounded-xl hover:bg-brand-100 hover:shadow-sm transition-all font-medium"
             >
               AI Analysis
             </Link>
             <Link
               href={`/graph?type=product&id=${slug}`}
-              className="px-3 py-1.5 text-sm bg-purple-50 text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors font-medium"
+              className="px-3 py-1.5 text-sm bg-purple-50 text-purple-700 border border-purple-200 rounded-xl hover:bg-purple-100 hover:shadow-sm transition-all font-medium"
             >
               3D Graph
             </Link>
             <Link
               href={`/compare?type=product&ids=${slug}`}
-              className="px-3 py-1.5 text-sm bg-slate-50 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors font-medium"
+              className="px-3 py-1.5 text-sm bg-slate-50 text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-100 hover:shadow-sm transition-all font-medium"
             >
               Compare
             </Link>
@@ -158,11 +167,12 @@ export default function ProductDetailPage({
         <div className="lg:col-span-2 space-y-5">
           {/* LLM Summary */}
           {profile.profile_text && (
-            <div className="glass-card p-6">
-              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            <div className="glass-card p-6 animate-fade-in-up" style={{ animationDelay: "0.1s", animationFillMode: "both" }}>
+              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 Profile Summary
               </h2>
-              <p className="text-slate-700 leading-relaxed">
+              <p className="text-slate-700 leading-relaxed text-sm">
                 <HighlightedText text={profile.profile_text} keywords={keywords} />
               </p>
             </div>
@@ -170,11 +180,18 @@ export default function ProductDetailPage({
 
           {/* Subjects */}
           {sf.subjects && (sf.subjects as string[]).length > 0 && (
-            <div className="glass-card p-6">
-              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Subjects</h2>
+            <div className="glass-card p-6 animate-fade-in-up" style={{ animationDelay: "0.15s", animationFillMode: "both" }}>
+              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                Subjects
+              </h2>
               <div className="flex flex-wrap gap-2">
-                {(sf.subjects as string[]).map((s) => (
-                  <span key={s} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium border border-blue-100">
+                {(sf.subjects as string[]).map((s, i) => (
+                  <span
+                    key={s}
+                    className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-medium border border-blue-100 hover:bg-blue-100 transition-colors cursor-default animate-scale-in"
+                    style={{ animationDelay: `${0.2 + i * 0.05}s`, animationFillMode: "both" }}
+                  >
                     {s}
                   </span>
                 ))}
@@ -184,11 +201,18 @@ export default function ProductDetailPage({
 
           {/* Key Features */}
           {sf.key_features && (sf.key_features as string[]).length > 0 && (
-            <div className="glass-card p-6">
-              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Key Features</h2>
+            <div className="glass-card p-6 animate-fade-in-up" style={{ animationDelay: "0.2s", animationFillMode: "both" }}>
+              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                Key Features
+              </h2>
               <div className="space-y-2">
                 {(sf.key_features as string[]).map((f, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                  <div
+                    key={i}
+                    className="flex items-start gap-2 text-sm text-slate-700 animate-slide-up"
+                    style={{ animationDelay: `${0.25 + i * 0.05}s`, animationFillMode: "both" }}
+                  >
                     <svg className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                     </svg>
@@ -200,17 +224,20 @@ export default function ProductDetailPage({
           )}
 
           {/* All Structured Fields */}
-          <div className="glass-card p-6">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">All Profile Fields</h2>
+          <div className="glass-card p-6 animate-fade-in-up" style={{ animationDelay: "0.25s", animationFillMode: "both" }}>
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+              All Profile Fields
+            </h2>
             <div className="grid grid-cols-1 gap-y-3 text-sm">
               {Object.entries(sf).map(([key, value]) => (
-                <div key={key} className="flex justify-between items-baseline py-1 border-b border-slate-50">
+                <div key={key} className="flex justify-between items-baseline py-1.5 border-b border-slate-100/60 hover:bg-slate-50/50 rounded px-1 -mx-1 transition-colors">
                   <span className="text-slate-400 text-xs capitalize">{key.replace(/_/g, " ")}</span>
                   <span className="text-slate-800 font-medium text-right max-w-xs text-xs">
                     {Array.isArray(value) ? (
                       <span className="flex flex-wrap gap-1 justify-end">
                         {value.map((v: string, i: number) => (
-                          <span key={i} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[11px]">{v}</span>
+                          <span key={i} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[11px] border border-emerald-100/50">{v}</span>
                         ))}
                       </span>
                     ) : (
@@ -223,7 +250,7 @@ export default function ProductDetailPage({
           </div>
 
           {/* Metadata */}
-          <div className="glass-card p-3 text-[11px] text-slate-400 flex items-center gap-2">
+          <div className="glass-card-static p-3 text-[11px] text-slate-400 flex items-center gap-2 animate-fade-in" style={{ animationDelay: "0.3s", animationFillMode: "both" }}>
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -233,7 +260,8 @@ export default function ProductDetailPage({
 
         {/* Right: Similar products */}
         <div className="space-y-4">
-          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-teal-400" />
             Similar Products
           </h2>
           {similar.length === 0 ? (
@@ -244,6 +272,43 @@ export default function ProductDetailPage({
             similar.map((s, i) => (
               <ProductSimilarCard key={s.entity_id} item={s} slug={slug} rank={i + 1} sourceFields={profile.structured_fields} />
             ))
+          )}
+
+          {/* Best Fit Schools */}
+          {recommendations.length > 0 && (
+            <>
+              <div className="flex items-center justify-between mt-6">
+                <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                  Best Fit Schools
+                </h2>
+                <Link href={`/match?type=product&id=${slug}`} className="text-[10px] text-brand-500 hover:text-brand-700 font-medium">
+                  View all
+                </Link>
+              </div>
+              {recommendations.map((rec, i) => {
+                const score = Math.round(rec.match_score * 100);
+                const sf = rec.structured_fields || {};
+                return (
+                  <div key={rec.entity_id} className="glass-card p-3 animate-slide-up group hover:border-rose-200/50 transition-all" style={{ animationDelay: `${(similar.length + i) * 0.06}s`, animationFillMode: "both" }}>
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold ${score >= 60 ? "bg-emerald-50 text-emerald-600" : score >= 40 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-500"}`}>
+                        {score}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <Link href={`/schools/${rec.entity_id}`} className="text-xs font-semibold text-slate-800 hover:text-brand-600 transition-colors truncate block">
+                          {rec.entity_name}
+                        </Link>
+                        <div className="flex gap-1 mt-0.5">
+                          {sf.phase && <span className="text-[9px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded">{sf.phase}</span>}
+                          {sf.local_authority && <span className="text-[9px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded truncate max-w-[120px]">{sf.local_authority}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       </div>
@@ -283,10 +348,10 @@ function ProductSimilarCard({
   const total = item.structured_score + item.embedding_score + (item.graph_score || 0);
 
   return (
-    <div className="glass-card p-4 animate-slide-up" style={{ animationDelay: `${rank * 0.05}s` }}>
+    <div className="glass-card p-4 animate-slide-up group hover:border-emerald-200/50 transition-all duration-300" style={{ animationDelay: `${rank * 0.06}s`, animationFillMode: "both" }}>
       <div className="flex items-start gap-3">
         <div className="relative flex-shrink-0">
-          <svg className="w-12 h-12 score-ring" viewBox="0 0 36 36">
+          <svg className="w-12 h-12 score-ring score-ring-animated" viewBox="0 0 36 36">
             <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e2e8f0" strokeWidth="2.5" />
             <circle cx="18" cy="18" r="15.5" fill="none" className={ringColor} strokeWidth="2.5"
               strokeDasharray={`${score * 0.975} 100`} strokeLinecap="round" transform="rotate(-90 18 18)" />
@@ -296,19 +361,19 @@ function ProductSimilarCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-slate-400 font-mono">#{rank}</span>
+            <span className="text-[10px] text-slate-400 font-mono bg-slate-100 px-1.5 py-0.5 rounded">#{rank}</span>
             <Link
               href={`/products/${item.entity_id}`}
-              className="text-sm font-medium text-slate-800 hover:text-emerald-600 transition-colors truncate"
+              className="text-sm font-semibold text-slate-800 hover:text-emerald-600 transition-colors truncate"
             >
               {item.entity_name}
             </Link>
           </div>
 
-          <div className="flex h-1.5 rounded-full overflow-hidden mt-2 gap-px">
-            <div className="bg-blue-400 rounded-l-full" style={{ width: `${total > 0 ? (item.structured_score / total) * 100 : 0}%` }} />
-            <div className="bg-emerald-400" style={{ width: `${total > 0 ? (item.embedding_score / total) * 100 : 0}%` }} />
-            <div className="bg-purple-400 rounded-r-full" style={{ width: `${total > 0 ? ((item.graph_score || 0) / total) * 100 : 0}%` }} />
+          <div className="flex h-1.5 rounded-full overflow-hidden mt-2 gap-px bg-slate-100">
+            <div className="bg-blue-400 rounded-l-full transition-all duration-700" style={{ width: `${total > 0 ? (item.structured_score / total) * 100 : 0}%` }} />
+            <div className="bg-emerald-400 transition-all duration-700" style={{ width: `${total > 0 ? (item.embedding_score / total) * 100 : 0}%` }} />
+            <div className="bg-purple-400 rounded-r-full transition-all duration-700" style={{ width: `${total > 0 ? ((item.graph_score || 0) / total) * 100 : 0}%` }} />
           </div>
           <div className="flex gap-2 mt-1 text-[10px] text-slate-400">
             <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 bg-blue-400 rounded-full inline-block" /> {Math.round(item.structured_score * 100)}%</span>
@@ -328,11 +393,11 @@ function ProductSimilarCard({
             <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">{item.explanation}</p>
           )}
 
-          <div className="flex gap-3 mt-2">
+          <div className="flex gap-3 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <Link href={`/compare?type=product&ids=${slug},${item.entity_id}`}
-              className="text-[11px] text-slate-400 hover:text-emerald-600 transition-colors">Compare</Link>
+              className="text-[11px] text-emerald-500 hover:text-emerald-700 transition-colors font-medium">Compare</Link>
             <Link href={`/analyze?type=product&id=${item.entity_id}`}
-              className="text-[11px] text-slate-400 hover:text-emerald-600 transition-colors">AI Analysis</Link>
+              className="text-[11px] text-emerald-500 hover:text-emerald-700 transition-colors font-medium">AI Analysis</Link>
           </div>
         </div>
       </div>

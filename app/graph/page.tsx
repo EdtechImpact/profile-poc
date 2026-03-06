@@ -1,9 +1,11 @@
 "use client";
 
-import { Suspense, useState, useEffect, useRef, useCallback } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import EntitySearchSelect from "../components/entity-search";
+import SpriteText from "three-spritetext";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const ForceGraph3D = dynamic(() => import("react-force-graph-3d"), {
@@ -17,6 +19,9 @@ interface GraphNode {
   type: string;
   color?: string;
   properties?: Record<string, unknown>;
+  x?: number;
+  y?: number;
+  z?: number;
   __threeObj?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
@@ -75,15 +80,83 @@ function GraphPage() {
 
   const [entityType, setEntityType] = useState(initialType);
   const [entityId, setEntityId] = useState(initialId);
+  const [entityName, setEntityName] = useState("");
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(false);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [highlightNodes, setHighlightNodes] = useState<Set<string>>(new Set());
   const [depth, setDepth] = useState(2);
+  const [showLabels, setShowLabels] = useState(true);
+  const [viewMode, setViewMode] = useState<"all" | "entity">(initialId ? "entity" : "all");
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set());
   const graphRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const loadGraph = useCallback(async () => {
+  // Filtered graph data based on hidden types
+  const filteredGraphData = useMemo(() => {
+    if (hiddenTypes.size === 0) return graphData;
+    const visibleNodes = graphData.nodes.filter(n => !hiddenTypes.has(n.type));
+    const visibleIds = new Set(visibleNodes.map(n => n.id));
+    const visibleLinks = graphData.links.filter(l => {
+      const srcId = typeof l.source === "string" ? l.source : (l.source as GraphNode).id;
+      const tgtId = typeof l.target === "string" ? l.target : (l.target as GraphNode).id;
+      return visibleIds.has(srcId) && visibleIds.has(tgtId);
+    });
+    return { nodes: visibleNodes, links: visibleLinks };
+  }, [graphData, hiddenTypes]);
+
+  // Node type counts
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    graphData.nodes.forEach(n => { counts[n.type] = (counts[n.type] || 0) + 1; });
+    return counts;
+  }, [graphData.nodes]);
+
+  // Selected node connections
+  const selectedNodeConnections = useMemo(() => {
+    if (!selectedNode) return [];
+    const connections: { node: GraphNode; relType: string }[] = [];
+    filteredGraphData.links.forEach(link => {
+      const srcId = typeof link.source === "string" ? link.source : (link.source as GraphNode).id;
+      const tgtId = typeof link.target === "string" ? link.target : (link.target as GraphNode).id;
+      if (srcId === selectedNode.id) {
+        const targetNode = filteredGraphData.nodes.find(n => n.id === tgtId);
+        if (targetNode) connections.push({ node: targetNode, relType: link.type });
+      } else if (tgtId === selectedNode.id) {
+        const sourceNode = filteredGraphData.nodes.find(n => n.id === srcId);
+        if (sourceNode) connections.push({ node: sourceNode, relType: link.type });
+      }
+    });
+    return connections;
+  }, [selectedNode, filteredGraphData]);
+
+  const loadAllGraph = useCallback(async () => {
+    setLoading(true);
+    setSelectedNode(null);
+    setHighlightNodes(new Set());
+    try {
+      const res = await fetch(`/api/graph/all?limit=500`);
+      const data = await res.json();
+      if (data.nodes) {
+        const nodes = data.nodes.map((n: GraphNode) => ({
+          ...n,
+          color: NODE_COLORS[n.type] || "#94a3b8",
+        }));
+        setGraphData({ nodes, links: data.links || [] });
+        setTimeout(() => {
+          if (graphRef.current) {
+            graphRef.current.zoomToFit(800, 50);
+          }
+        }, 500);
+      }
+    } catch {
+      setGraphData({ nodes: [], links: [] });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadEntityGraph = useCallback(async () => {
     if (!entityId) return;
     setLoading(true);
     setSelectedNode(null);
@@ -113,12 +186,24 @@ function GraphPage() {
   }, [entityType, entityId, depth]);
 
   useEffect(() => {
-    if (initialId) loadGraph();
+    if (initialType && initialId) {
+      fetch(`/api/profiles/${initialType}/${initialId}`)
+        .then((r) => r.json())
+        .then((data) => { if (data.profile) setEntityName(data.profile.entity_name); })
+        .catch(() => {});
+    }
+  }, [initialType, initialId]);
+
+  useEffect(() => {
+    if (initialId) {
+      loadEntityGraph();
+    } else {
+      loadAllGraph();
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleNodeClick = useCallback((node: GraphNode) => {
     setSelectedNode(node);
-    // Highlight the node and its immediate neighbors
     const neighbors = new Set<string>([node.id]);
     graphData.links.forEach((link) => {
       const srcId = typeof link.source === "string" ? link.source : (link.source as GraphNode).id;
@@ -128,7 +213,6 @@ function GraphPage() {
     });
     setHighlightNodes(neighbors);
 
-    // Aim camera at node
     if (graphRef.current) {
       const n = node as any; // eslint-disable-line @typescript-eslint/no-explicit-any
       const distance = 200;
@@ -146,6 +230,14 @@ function GraphPage() {
     setHighlightNodes(new Set());
   }, []);
 
+  const toggleType = (type: string) => {
+    setHiddenTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type); else next.add(type);
+      return next;
+    });
+  };
+
   return (
     <div className="max-w-full mx-auto animate-fade-in">
       <div className="flex items-center justify-between mb-6">
@@ -155,77 +247,129 @@ function GraphPage() {
             Interactive 3D visualization of entity relationships and shared attributes
           </p>
         </div>
-        {graphData.nodes.length > 0 && (
+        {filteredGraphData.nodes.length > 0 && (
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <span className="px-2 py-1 bg-slate-100 rounded-md">
-              {graphData.nodes.length} nodes
+              {filteredGraphData.nodes.length} nodes
             </span>
             <span className="px-2 py-1 bg-slate-100 rounded-md">
-              {graphData.links.length} edges
+              {filteredGraphData.links.length} edges
             </span>
           </div>
         )}
       </div>
 
       {/* Controls */}
-      <div className="glass-card p-4 mb-6">
-        <div className="flex gap-3 items-end">
-          <div>
-            <label className="text-xs text-slate-500 block mb-1.5 font-medium">Type</label>
-            <select
-              value={entityType}
-              onChange={(e) => setEntityType(e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400"
+      <div className="glass-card p-4 mb-6 overflow-visible relative z-20">
+        {/* View mode tabs */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
+            <button
+              onClick={() => { setViewMode("all"); loadAllGraph(); }}
+              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === "all" ? "bg-white text-brand-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
             >
-              <option value="school">School</option>
-              <option value="product">Product</option>
-            </select>
-          </div>
-          <div className="flex-1">
-            <label className="text-xs text-slate-500 block mb-1.5 font-medium">Entity ID</label>
-            <input
-              type="text"
-              value={entityId}
-              onChange={(e) => setEntityId(e.target.value)}
-              placeholder={entityType === "school" ? "Enter school URN..." : "Enter product slug..."}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400"
-              onKeyDown={(e) => e.key === "Enter" && loadGraph()}
-            />
-          </div>
-          <div>
-            <label className="text-xs text-slate-500 block mb-1.5 font-medium">Depth</label>
-            <select
-              value={depth}
-              onChange={(e) => setDepth(Number(e.target.value))}
-              className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400"
+              All Entities
+            </button>
+            <button
+              onClick={() => setViewMode("entity")}
+              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === "entity" ? "bg-white text-brand-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
             >
-              <option value={1}>1 hop</option>
-              <option value={2}>2 hops</option>
-              <option value={3}>3 hops</option>
-            </select>
+              Search Entity
+            </button>
           </div>
-          <button
-            onClick={loadGraph}
-            disabled={loading || !entityId}
-            className="px-5 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors flex items-center gap-2"
-          >
-            {loading ? (
-              <>
-                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Loading...
-              </>
-            ) : (
-              "Explore"
+
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showLabels}
+                onChange={(e) => setShowLabels(e.target.checked)}
+                className="rounded border-slate-300 text-brand-600 focus:ring-brand-500/30"
+              />
+              Labels
+            </label>
+            {viewMode === "all" && (
+              <button
+                onClick={loadAllGraph}
+                disabled={loading}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-medium text-slate-600 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {loading ? (
+                  <div className="w-3 h-3 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+                  </svg>
+                )}
+                Refresh
+              </button>
             )}
-          </button>
+          </div>
         </div>
+
+        {viewMode === "entity" ? (
+          <div className="flex gap-3 items-end">
+            <div>
+              <label className="text-xs text-slate-500 block mb-1.5 font-medium">Type</label>
+              <select
+                value={entityType}
+                onChange={(e) => setEntityType(e.target.value)}
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400"
+              >
+                <option value="school">School</option>
+                <option value="product">Product</option>
+              </select>
+            </div>
+            <div className="flex-1">
+              <label className="text-xs text-slate-500 block mb-1.5 font-medium">Entity</label>
+              <EntitySearchSelect
+                entityType={entityType}
+                onSelect={(id, name) => { setEntityId(id); setEntityName(name); }}
+                placeholder={`Search ${entityType}s by name...`}
+                selectedId={entityId}
+                selectedName={entityName}
+                onClear={() => { setEntityId(""); setEntityName(""); }}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 block mb-1.5 font-medium">Depth</label>
+              <select
+                value={depth}
+                onChange={(e) => setDepth(Number(e.target.value))}
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400"
+              >
+                <option value={1}>1 hop</option>
+                <option value={2}>2 hops</option>
+                <option value={3}>3 hops</option>
+              </select>
+            </div>
+            <button
+              onClick={loadEntityGraph}
+              disabled={loading || !entityId}
+              className="px-5 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                "Explore"
+              )}
+            </button>
+          </div>
+        ) : (
+          <div className="text-sm text-slate-500">
+            Showing all entities and relationships from the knowledge graph.
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* 3D Graph */}
         <div className="lg:col-span-3">
           <div ref={containerRef} className="graph-container relative">
-            {graphData.nodes.length === 0 ? (
+            {filteredGraphData.nodes.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-3">
                 {loading ? (
                   <>
@@ -237,7 +381,7 @@ function GraphPage() {
                     <svg className="w-16 h-16 text-slate-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
                     </svg>
-                    <span className="text-sm">Enter an entity ID and click Explore</span>
+                    <span className="text-sm">No graph data found. Try switching to &quot;Search Entity&quot; mode.</span>
                     <span className="text-xs text-slate-500">Drag to rotate, scroll to zoom, right-click to pan</span>
                   </>
                 )}
@@ -245,7 +389,7 @@ function GraphPage() {
             ) : (
               <ForceGraph3D
                 ref={graphRef}
-                graphData={graphData}
+                graphData={filteredGraphData}
                 nodeLabel={(node: GraphNode) => `${node.type}: ${node.label}`}
                 nodeColor={(node: GraphNode) => {
                   if (highlightNodes.size > 0 && !highlightNodes.has(node.id)) {
@@ -256,6 +400,16 @@ function GraphPage() {
                 nodeOpacity={0.9}
                 nodeResolution={16}
                 nodeVal={(node: GraphNode) => NODE_SIZES[node.type] || 4}
+                nodeThreeObject={showLabels ? (node: GraphNode) => {
+                  const sprite = new SpriteText(node.label);
+                  sprite.color = node.color || "#94a3b8";
+                  sprite.textHeight = 3;
+                  sprite.backgroundColor = "rgba(15, 23, 42, 0.75)";
+                  sprite.padding = 1.5;
+                  sprite.borderRadius = 2;
+                  return sprite;
+                } : undefined}
+                nodeThreeObjectExtend={false}
                 linkColor={() => "rgba(148, 163, 184, 0.3)"}
                 linkWidth={1}
                 linkOpacity={0.4}
@@ -280,22 +434,27 @@ function GraphPage() {
               />
             )}
 
-            {/* Floating legend */}
+            {/* Floating filter legend */}
             {graphData.nodes.length > 0 && (
               <div className="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur-sm rounded-xl px-4 py-3 border border-slate-700/50">
-                <div className="flex gap-3 flex-wrap">
+                <div className="flex gap-2 flex-wrap">
                   {Object.entries(NODE_COLORS).map(([type, color]) => {
-                    const count = graphData.nodes.filter(n => n.type === type).length;
+                    const count = typeCounts[type] || 0;
                     if (count === 0) return null;
+                    const hidden = hiddenTypes.has(type);
                     return (
-                      <div key={type} className="flex items-center gap-1.5 text-xs">
+                      <button
+                        key={type}
+                        onClick={() => toggleType(type)}
+                        className={`flex items-center gap-1.5 text-xs transition-opacity ${hidden ? "opacity-30" : "opacity-100"}`}
+                      >
                         <div
                           className="w-2.5 h-2.5 rounded-full"
-                          style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}40` }}
+                          style={{ backgroundColor: color, boxShadow: hidden ? "none" : `0 0 6px ${color}40` }}
                         />
                         <span className="text-slate-300">{type}</span>
                         <span className="text-slate-500">({count})</span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -343,19 +502,44 @@ function GraphPage() {
                   Object.entries(selectedNode.properties).length > 0 && (
                     <div className="space-y-2 text-sm border-t border-slate-100 pt-3">
                       {Object.entries(selectedNode.properties).map(
-                        ([key, value]) => (
-                          <div key={key} className="flex justify-between gap-2">
-                            <span className="text-slate-400 text-xs capitalize">
-                              {key.replace(/_/g, " ")}
-                            </span>
-                            <span className="text-slate-700 text-xs font-medium text-right">
-                              {String(value)}
-                            </span>
-                          </div>
-                        )
+                        ([key, value]) => {
+                          const val = String(value);
+                          if (!val || val === "undefined" || val === "") return null;
+                          return (
+                            <div key={key} className="flex justify-between gap-2">
+                              <span className="text-slate-400 text-xs capitalize">
+                                {key.replace(/_/g, " ")}
+                              </span>
+                              <span className="text-slate-700 text-xs font-medium text-right">
+                                {val}
+                              </span>
+                            </div>
+                          );
+                        }
                       )}
                     </div>
                   )}
+
+                {/* Connections */}
+                {selectedNodeConnections.length > 0 && (
+                  <div className="border-t border-slate-100 pt-3 mt-3">
+                    <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-2">
+                      {selectedNodeConnections.length} Connection{selectedNodeConnections.length !== 1 ? "s" : ""}
+                    </div>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {selectedNodeConnections.map((conn, i) => (
+                        <div key={i} className="flex items-center gap-1.5 text-[11px]">
+                          <div
+                            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: NODE_COLORS[conn.node.type] || "#94a3b8" }}
+                          />
+                          <span className="text-slate-600 truncate">{conn.node.label}</span>
+                          <span className="text-slate-300 text-[9px] ml-auto flex-shrink-0">{conn.relType.replace(/_/g, " ")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {(selectedNode.type === "School" || selectedNode.type === "Product") && (
                   <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
@@ -380,6 +564,36 @@ function GraphPage() {
               </div>
             )}
           </div>
+
+          {/* Graph Stats */}
+          {graphData.nodes.length > 0 && (
+            <div>
+              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                Graph Stats
+              </h2>
+              <div className="glass-card p-3 space-y-2">
+                {Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
+                  <div key={type} className="flex items-center gap-2">
+                    <div
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: NODE_COLORS[type] || "#94a3b8" }}
+                    />
+                    <span className="text-[11px] text-slate-600 flex-1">{type}</span>
+                    <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${(count / Math.max(...Object.values(typeCounts))) * 100}%`,
+                          backgroundColor: NODE_COLORS[type] || "#94a3b8",
+                        }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono w-5 text-right">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Communities */}
           <div>

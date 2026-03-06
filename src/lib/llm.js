@@ -13,7 +13,7 @@ const bedrock = new BedrockRuntimeClient({
 });
 
 const MODEL_ID =
-  process.env.BEDROCK_MODEL_ID || "eu.anthropic.claude-3-5-haiku-20241022-v1:0";
+  process.env.BEDROCK_MODEL_ID || "anthropic.claude-3-haiku-20240307-v1:0";
 
 export async function callClaude(prompt, { maxTokens = 1024, temperature = 0.2 } = {}) {
   const command = new InvokeModelCommand({

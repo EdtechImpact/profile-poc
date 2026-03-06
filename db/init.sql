@@ -36,7 +36,7 @@ CREATE TABLE entity_profiles (
 
   raw_data JSONB,
   profile_text TEXT,
-  profile_embedding vector(1536),
+  profile_embedding vector(1024),
 
   profiled_at TIMESTAMPTZ DEFAULT NOW(),
   profiled_by TEXT DEFAULT 'titan-v2',
