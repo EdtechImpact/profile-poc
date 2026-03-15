@@ -405,12 +405,16 @@ function SimilarTab({ urn, sourceFields }: { urn: string; sourceFields: Record<s
 
                 {/* Ask Advisor */}
                 <div className="mt-3">
-                  <Link
-                    href={`/chat?q=${encodeURIComponent(`Tell me why school ${urn} is similar to ${item.entity_name} (${item.entity_id}) and what they can learn from each other`)}`}
+                  <button
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent("open-advisor", {
+                        detail: { query: `Tell me why school ${urn} is similar to ${item.entity_name} (${item.entity_id}) and what they can learn from each other` },
+                      }));
+                    }}
                     className="text-[11px] px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-100 transition-all font-medium"
                   >
                     Ask Advisor
-                  </Link>
+                  </button>
                 </div>
               </div>
             </div>
@@ -551,12 +555,16 @@ function RecommendationsTab({ urn }: { urn: string }) {
 
                 {/* Ask Advisor */}
                 <div className="mt-3">
-                  <Link
-                    href={`/chat?q=${encodeURIComponent(`Why is ${rec.entity_name} a good product recommendation for school ${urn}? Analyze the match in detail.`)}`}
+                  <button
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent("open-advisor", {
+                        detail: { query: `Why is ${rec.entity_name} a good product recommendation for school ${urn}? Analyze the match in detail.` },
+                      }));
+                    }}
                     className="text-[11px] px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-100 transition-all font-medium"
                   >
                     Ask Advisor
-                  </Link>
+                  </button>
                 </div>
               </div>
             </div>

@@ -3,6 +3,7 @@ import "./globals.css";
 import { SidebarNav } from "./components/sidebar-nav";
 import { AWSCredentialsProvider } from "./components/aws-credentials-provider";
 import LayoutInner from "./components/layout-inner";
+import { AdvisorWrapper } from "./components/advisor-wrapper";
 
 export const metadata: Metadata = {
   title: "Profile POC - EdTech Impact",
@@ -26,8 +27,8 @@ export default function RootLayout({
           <SidebarNav />
           <main className="flex-1 overflow-auto bg-mesh">
             <LayoutInner>{children}</LayoutInner>
-
           </main>
+          <AdvisorWrapper />
         </AWSCredentialsProvider>
       </body>
     </html>

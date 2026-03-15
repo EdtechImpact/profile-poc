@@ -449,12 +449,16 @@ function SimilarProductsTab({ slug, sourceFields }: { slug: string; sourceFields
                 ) : null}
 
                 <div className="mt-3">
-                  <Link
-                    href={`/chat?q=${encodeURIComponent(`Compare product ${slug} with ${item.entity_name} (${item.entity_id}). What are the key differences?`)}`}
+                  <button
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent("open-advisor", {
+                        detail: { query: `Compare product ${slug} with ${item.entity_name} (${item.entity_id}). What are the key differences?` },
+                      }));
+                    }}
                     className="text-[11px] px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-100 transition-all font-medium"
                   >
                     Ask Advisor
-                  </Link>
+                  </button>
                 </div>
               </div>
             </div>
@@ -565,12 +569,16 @@ function BestFitSchoolsTab({ slug }: { slug: string }) {
                 </div>
 
                 <div className="mt-3">
-                  <Link
-                    href={`/chat?q=${encodeURIComponent(`Why is school ${rec.entity_id} (${rec.entity_name}) a good fit for product ${slug}? Analyze the match.`)}`}
+                  <button
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent("open-advisor", {
+                        detail: { query: `Why is school ${rec.entity_id} (${rec.entity_name}) a good fit for product ${slug}? Analyze the match.` },
+                      }));
+                    }}
                     className="text-[11px] px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-100 transition-all font-medium"
                   >
                     Ask Advisor
-                  </Link>
+                  </button>
                 </div>
               </div>
             </div>
