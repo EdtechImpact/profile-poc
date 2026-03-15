@@ -218,6 +218,7 @@ export function EntityDetailModal({ entityType, entityId, onClose, onNavigate }:
                         key={item.entity_id}
                         item={item}
                         rank={i + 1}
+                        sourceId={entityId}
                         sourceName={profile.entity_name}
                         sourceSf={sf}
                         isSchool={isSchool}
@@ -257,8 +258,8 @@ function highlightSharedWords(text: string, sharedSet: Set<string>): React.React
 
 // ─── Similar Card ────────────────────────────────────────────────────────────
 
-function SimilarCard({ item, rank, sourceName, sourceSf, isSchool, onClick }: {
-  item: SimilarEntity; rank: number; sourceName: string; sourceSf: Record<string, any>; isSchool: boolean; onClick: () => void;
+function SimilarCard({ item, rank, sourceId, sourceName, sourceSf, isSchool, onClick }: {
+  item: SimilarEntity; rank: number; sourceId: string; sourceName: string; sourceSf: Record<string, any>; isSchool: boolean; onClick: () => void;
 }) {
   const score = Math.round(item.similarity_score * 100);
   const isf = item.structured_fields || {};
@@ -546,8 +547,150 @@ function SimilarCard({ item, rank, sourceName, sourceSf, isSchool, onClick }: {
           </div>
         )}
 
-        {/* ── 6. AI Inline Analysis ── */}
+        {/* ── 6. Knowledge Graph Connection ── */}
+        <GraphConnection
+          entityType={isSchool ? "school" : "product"}
+          sourceId={sourceId}
+          sourceName={sourceName}
+          targetId={item.entity_id}
+          targetName={item.entity_name}
+        />
+
+        {/* ── 7. AI Inline Analysis ── */}
         <InlineAIAnalysis sourceName={sourceName} targetName={item.entity_name} score={score} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Graph Connection ────────────────────────────────────────────────────────
+
+function GraphConnection({ entityType, sourceId, sourceName, targetId, targetName }: {
+  entityType: string; sourceId: string; sourceName: string; targetId: string; targetName: string;
+}) {
+  const [nodes, setNodes] = useState<any[]>([]);
+  const [links, setLinks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!sourceId || !targetId) { setLoading(false); return; }
+    // Fetch neighbors for both entities at depth 1 and find shared connections
+    Promise.all([
+      fetch(`/api/graph/neighbors/${entityType}/${sourceId}?depth=1`).then(r => r.json()),
+      fetch(`/api/graph/neighbors/${entityType}/${targetId}?depth=1`).then(r => r.json()),
+    ]).then(([srcData, tgtData]) => {
+      const srcNodes = new Map((srcData.nodes || []).map((n: any) => [n.id, n]));
+      const tgtNodes = new Map((tgtData.nodes || []).map((n: any) => [n.id, n]));
+
+      // Find shared intermediate nodes (not the entities themselves)
+      const srcEntityId = `${entityType === "school" ? "School" : "Product"}_${sourceId}`;
+      const tgtEntityId = `${entityType === "school" ? "School" : "Product"}_${targetId}`;
+
+      const sharedIds = [...srcNodes.keys()].filter(id => tgtNodes.has(id) && id !== srcEntityId && id !== tgtEntityId);
+
+      // Build a mini graph: source → shared nodes → target
+      const graphNodes: any[] = [
+        { id: "source", label: sourceName, type: entityType === "school" ? "School" : "Product" },
+        { id: "target", label: targetName, type: entityType === "school" ? "School" : "Product" },
+      ];
+      const graphLinks: any[] = [];
+
+      for (const sid of sharedIds) {
+        const node = srcNodes.get(sid) || tgtNodes.get(sid);
+        if (node) {
+          graphNodes.push({ id: sid, label: node.label || sid, type: node.type || "Node" });
+          graphLinks.push({ source: "source", target: sid });
+          graphLinks.push({ source: sid, target: "target" });
+        }
+      }
+
+      setNodes(graphNodes);
+      setLinks(graphLinks);
+    }).catch(() => {
+      setNodes([]);
+      setLinks([]);
+    }).finally(() => setLoading(false));
+  }, [entityType, sourceId, targetId, sourceName, targetName]);
+
+  if (loading) return null;
+  if (nodes.length <= 2) return null; // No shared graph connections
+
+  const sharedNodes = nodes.filter(n => n.id !== "source" && n.id !== "target");
+
+  const NODE_COLORS: Record<string, string> = {
+    School: "#3b82f6", Product: "#8b5cf6", Phase: "#6366f1",
+    Region: "#06b6d4", Subject: "#f59e0b", Category: "#10b981", Trust: "#64748b",
+  };
+
+  return (
+    <div>
+      <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+        </svg>
+        Knowledge Graph Path
+        <span className="text-emerald-500 normal-case font-medium">{sharedNodes.length} shared connection{sharedNodes.length !== 1 ? "s" : ""}</span>
+      </div>
+      <div className="bg-slate-50/60 rounded-xl p-3 border border-slate-100">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Source node */}
+          <motion.span
+            className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-200 shrink-0"
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            {sourceName.length > 18 ? sourceName.slice(0, 16) + "…" : sourceName}
+          </motion.span>
+
+          <motion.svg className="w-4 h-4 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </motion.svg>
+
+          {/* Shared intermediate nodes */}
+          {sharedNodes.map((node, i) => {
+            const color = NODE_COLORS[node.type] || "#94a3b8";
+            return (
+              <motion.span
+                key={node.id}
+                className="px-2 py-0.5 rounded-lg text-[10px] font-semibold border shrink-0"
+                style={{ backgroundColor: `${color}15`, color: color, borderColor: `${color}40` }}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.15 + i * 0.08 }}
+              >
+                {node.label}
+              </motion.span>
+            );
+          })}
+
+          <motion.svg className="w-4 h-4 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 + sharedNodes.length * 0.08 }}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </motion.svg>
+
+          {/* Target node */}
+          <motion.span
+            className="px-2.5 py-1 bg-purple-100 text-purple-700 rounded-lg text-[10px] font-bold border border-purple-200 shrink-0"
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 + sharedNodes.length * 0.08 }}
+          >
+            {targetName.length > 18 ? targetName.slice(0, 16) + "…" : targetName}
+          </motion.span>
+        </div>
+
+        {/* Node type legend */}
+        {sharedNodes.length > 0 && (
+          <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200/40">
+            {[...new Set(sharedNodes.map(n => n.type))].map(type => (
+              <span key={type} className="flex items-center gap-1 text-[9px] text-slate-400">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: NODE_COLORS[type] || "#94a3b8" }} />
+                {type}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
