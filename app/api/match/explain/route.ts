@@ -114,7 +114,6 @@ Respond ONLY with the JSON object, no other text.`;
     });
   } catch (e: unknown) {
     console.error("Match explain error:", e);
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

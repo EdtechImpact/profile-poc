@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { EntityDetailModal } from "@/app/components/shared/EntityDetailModal";
 
 interface Profile {
@@ -41,6 +41,14 @@ export default function SchoolsPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(value), 200);
+  }, []);
   const [filters, setFilters] = useState({ phase: "", type: "", region: "", ofsted_rating: "", size_band: "" });
   const [sortKey, setSortKey] = useState<SortKey>("name-az");
   const [selectedEntity, setSelectedEntity] = useState<{ type: "school" | "product"; id: string } | null>(null);
@@ -73,8 +81,8 @@ export default function SchoolsPage() {
   const filtered = useMemo(() => {
     return profiles.filter((p) => {
       const sf = p.structured_fields;
-      if (search) {
-        const q = search.toLowerCase();
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase();
         if (!p.entity_name.toLowerCase().includes(q) && !p.entity_id.toLowerCase().includes(q)) return false;
       }
       if (filters.phase && sf.phase !== filters.phase) return false;
@@ -84,7 +92,7 @@ export default function SchoolsPage() {
       if (filters.size_band && sf.size_band !== filters.size_band) return false;
       return true;
     });
-  }, [profiles, search, filters]);
+  }, [profiles, debouncedSearch, filters]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -158,7 +166,7 @@ export default function SchoolsPage() {
             type="text"
             placeholder="Search by school name or URN..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-transparent rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-brand-300 focus:ring-2 focus:ring-brand-100 transition-all"
           />
         </div>

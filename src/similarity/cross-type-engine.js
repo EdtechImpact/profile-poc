@@ -4,8 +4,8 @@ import { computeCrossTypeScore } from "./cross-type-scorer.js";
 
 const CROSS_WEIGHTS = {
   structured: 0.40,
-  embedding: 0.30,
-  graph: 0.30,
+  embedding: 0.35,
+  graph: 0.25, // Cross-type graph uses all relationships (inherently non-redundant across types)
 };
 
 function parseEmbedding(embeddingStr) {
@@ -65,21 +65,35 @@ export async function findRecommendations(sourceType, sourceId, { top = 10 } = {
       }
     }
   } catch (e) {
-    console.warn("Cross-type graph unavailable:", e.message);
+    // Cross-type graph unavailable — continue without it
   }
 
-  // 3. Score all candidates
+  // 3. Batch-fetch missing profiles to avoid N+1
+  const missingIds = [...candidateMap.entries()]
+    .filter(([, c]) => !c.structured_fields)
+    .map(([id]) => id);
+
+  if (missingIds.length > 0) {
+    const missingProfiles = await Promise.all(
+      missingIds.map((id) => getProfile(targetType, id))
+    );
+    for (let i = 0; i < missingIds.length; i++) {
+      const profile = missingProfiles[i];
+      const candidate = candidateMap.get(missingIds[i]);
+      if (candidate && profile) {
+        candidate.structured_fields = profile.structured_fields || {};
+        candidate.entity_name = candidate.entity_name || profile.entity_name;
+        candidate.profile_text = profile.profile_text;
+      }
+    }
+  }
+
+  // 4. Score all candidates
   const results = [];
   const sourceFields = source.structured_fields || {};
 
   for (const [candidateId, candidate] of candidateMap) {
-    let candidateFields = candidate.structured_fields;
-    if (!candidateFields) {
-      const profile = await getProfile(targetType, candidateId);
-      candidateFields = profile?.structured_fields || {};
-      candidate.entity_name = candidate.entity_name || profile?.entity_name;
-      candidate.profile_text = profile?.profile_text;
-    }
+    const candidateFields = candidate.structured_fields || {};
 
     // Cross-type structured scoring
     const [schoolFields, productFields] =

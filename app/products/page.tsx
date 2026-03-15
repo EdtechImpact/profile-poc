@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { EntityDetailModal } from "@/app/components/shared/EntityDetailModal";
 
 interface Profile {
@@ -58,7 +58,15 @@ const SEND_CONFIG: Record<string, { label: string; color: string; icon: string }
 export default function ProductsPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleQueryChange = useCallback((value: string) => {
+    setQuery(value);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedQuery(value), 200);
+  }, []);
   const [pedagogyFilter, setPedagogyFilter] = useState("");
   const [sendFilter, setSendFilter] = useState("");
   const [schoolTypeFilter, setSchoolTypeFilter] = useState("");
@@ -99,8 +107,8 @@ export default function ProductsPage() {
   const filtered = useMemo(() => {
     return profiles.filter((p) => {
       const sf = p.structured_fields;
-      if (query) {
-        const q = query.toLowerCase();
+      if (debouncedQuery) {
+        const q = debouncedQuery.toLowerCase();
         if (
           !p.entity_name.toLowerCase().includes(q) &&
           !p.entity_id.toLowerCase().includes(q) &&
@@ -115,7 +123,7 @@ export default function ProductsPage() {
       }
       return true;
     });
-  }, [profiles, query, pedagogyFilter, sendFilter, schoolTypeFilter]);
+  }, [profiles, debouncedQuery, pedagogyFilter, sendFilter, schoolTypeFilter]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -201,7 +209,7 @@ export default function ProductsPage() {
             type="text"
             placeholder="Search by product name or description..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleQueryChange(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-transparent rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-brand-300 focus:ring-2 focus:ring-brand-100 transition-all"
           />
         </div>
@@ -297,7 +305,7 @@ export default function ProductsPage() {
   );
 }
 
-function ProductCard({ profile, onClick }: { profile: Profile; onClick: () => void }) {
+const ProductCard = React.memo(function ProductCard({ profile, onClick }: { profile: Profile; onClick: () => void }) {
   const sf = profile.structured_fields;
   const theme = getTheme(sf.pedagogy_style);
   const valueProp = sf.value_proposition
@@ -407,7 +415,7 @@ function ProductCard({ profile, onClick }: { profile: Profile; onClick: () => vo
       </div>
     </div>
   );
-}
+});
 
 function FilterSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
   return (

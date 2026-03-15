@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import MatchDNA from "./match-dna";
 import PeerContext from "./peer-context";
 import { useAWSCredentials } from "./aws-credentials-provider";
@@ -28,7 +28,7 @@ interface MatchExplanationPanelProps {
   onClose: () => void;
 }
 
-export default function MatchExplanationPanel({
+export default React.memo(function MatchExplanationPanel({
   schoolId,
   productId,
   schoolName,
@@ -47,10 +47,12 @@ export default function MatchExplanationPanel({
       setError("AWS Bedrock credentials required. Click the settings button to configure.");
       return;
     }
+    const controller = new AbortController();
     fetch("/api/match/explain", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getHeaders() },
       body: JSON.stringify({ school_id: schoolId, product_id: productId }),
+      signal: controller.signal,
     })
       .then((r) => r.json())
       .then((data) => {
@@ -60,8 +62,9 @@ export default function MatchExplanationPanel({
           setFullData(data);
         }
       })
-      .catch((e) => setError(e.message))
+      .catch((e) => { if (e.name !== "AbortError") setError(e.message); })
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, [schoolId, productId, isConfigured, getHeaders]);
 
   return (
@@ -301,4 +304,4 @@ export default function MatchExplanationPanel({
       </div>
     </div>
   );
-}
+});

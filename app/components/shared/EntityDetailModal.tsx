@@ -1,8 +1,11 @@
 // @ts-nocheck
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
+import dynamic from "next/dynamic";
+
+const ForceGraph3D = dynamic(() => import("react-force-graph-3d"), { ssr: false });
 
 interface EntityDetailModalProps {
   entityType: "school" | "product";
@@ -28,6 +31,7 @@ interface SimilarEntity {
   structured_score: number;
   embedding_score: number;
   graph_score: number;
+  shared_graph_nodes?: string[];
   explanation: string;
   structured_fields: Record<string, any>;
 }
@@ -85,7 +89,7 @@ export function EntityDetailModal({ entityType, entityId, onClose, onNavigate }:
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-[900px] max-h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-in"
+        className="relative w-full max-w-[1000px] max-h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Hero header ── */}
@@ -172,33 +176,27 @@ export function EntityDetailModal({ entityType, entityId, onClose, onNavigate }:
               )}
 
               {/* ── Key info row ── */}
-              <div className="flex flex-wrap gap-6">
+              <div className="space-y-3">
                 {isSchool && sf.likely_tech_needs && Array.isArray(sf.likely_tech_needs) && sf.likely_tech_needs.length > 0 && (
-                  <div className="flex-1 min-w-[200px]">
+                  <div>
                     <SectionHeader icon="tech" label="Technology Needs" />
                     <div className="flex flex-wrap gap-1.5">
                       {sf.likely_tech_needs.map((need: string) => (
                         <span key={need} className="px-2.5 py-1 rounded-lg bg-brand-50 text-xs font-medium text-brand-700">{need}</span>
                       ))}
+                      {sf.deprivation_level && (
+                        <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-xs font-medium text-amber-700 capitalize">Deprivation: {sf.deprivation_level}</span>
+                      )}
+                      {sf.size_band && (
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-xs font-medium text-slate-600">Size: {sf.size_band}</span>
+                      )}
                     </div>
                   </div>
                 )}
                 {!isSchool && sf.competitive_positioning && (
-                  <div className="flex-1 min-w-[200px]">
+                  <div>
                     <SectionHeader icon="market" label="Market Positioning" />
                     <p className="text-xs text-slate-500 leading-relaxed">{sf.competitive_positioning}</p>
-                  </div>
-                )}
-                {isSchool && sf.deprivation_level && (
-                  <div>
-                    <SectionHeader icon="info" label="Deprivation" />
-                    <span className="text-xs text-slate-600 font-medium capitalize">{sf.deprivation_level}</span>
-                  </div>
-                )}
-                {isSchool && sf.size_band && (
-                  <div>
-                    <SectionHeader icon="info" label="Size" />
-                    <span className="text-xs text-slate-600 font-medium">{sf.size_band}</span>
                   </div>
                 )}
               </div>
@@ -311,15 +309,21 @@ function SimilarCard({ item, rank, sourceId, sourceName, sourceSf, isSchool, onC
   const sourcePos = String(sourceSf.competitive_positioning || "");
   const targetPos = String(isf.competitive_positioning || "");
 
-  // Shared words for highlighting
-  const allSourceText = sourceDesc + " " + sourcePos;
-  const allTargetText = targetDesc + " " + targetPos;
-  const srcWords = extractWords(allSourceText);
-  const tgtWords = extractWords(allTargetText);
-  const sharedWordSet = new Set(srcWords.filter((w) => new Set(tgtWords).has(w)));
-  const sharedWordCount = sharedWordSet.size;
-  const totalUniqueWords = new Set([...srcWords, ...tgtWords]).size;
-  const textOverlapPct = totalUniqueWords > 0 ? sharedWordCount / totalUniqueWords : 0;
+  // Shared words for highlighting (memoized to avoid recomputation)
+  const { sharedWordSet, sharedWordCount, textOverlapPct } = useMemo(() => {
+    const allSourceText = sourceDesc + " " + sourcePos;
+    const allTargetText = targetDesc + " " + targetPos;
+    const srcWords = extractWords(allSourceText);
+    const tgtWords = extractWords(allTargetText);
+    const tgtWordSet = new Set(tgtWords);
+    const shared = new Set(srcWords.filter((w) => tgtWordSet.has(w)));
+    const totalUnique = new Set([...srcWords, ...tgtWords]).size;
+    return {
+      sharedWordSet: shared,
+      sharedWordCount: shared.size,
+      textOverlapPct: totalUnique > 0 ? shared.size / totalUnique : 0,
+    };
+  }, [sourceDesc, targetDesc, sourcePos, targetPos]);
 
   // Radar dimensions
   const radarDims = isSchool
@@ -351,22 +355,33 @@ function SimilarCard({ item, rank, sourceId, sourceName, sourceSf, isSchool, onC
         <ScorePill score={score} />
       </div>
 
-      <div className="px-5 py-4 space-y-4">
+      <div className="px-5 py-3">
+        <div className="grid grid-cols-[320px_1fr] gap-4">
 
-        {/* ── 1. Radar + Score breakdown side by side ── */}
-        <div className="flex items-start gap-4">
-          <div className="shrink-0">
-            <SimilarityRadar dims={radarDims} size={150} />
+          {/* ══ LEFT COLUMN: Radar + Graph ══ */}
+          <div className="flex flex-col items-center gap-2">
+            <SimilarityRadar dims={radarDims} size={240} />
+
+            {/* Interactive mini knowledge graph */}
+            {(item.shared_graph_nodes && item.shared_graph_nodes.length > 0) && (
+              <MiniForceGraph
+                sourceName={sourceName}
+                targetName={item.entity_name}
+                sharedNodes={item.shared_graph_nodes!}
+              />
+            )}
           </div>
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">How the score is built</div>
-            {/* Score Waterfall */}
-            <div className="relative">
-              <div className="w-full bg-slate-100 rounded-full overflow-hidden h-6 flex">
+
+          {/* ══ RIGHT COLUMN: Score + Fields + Description + Overlap ══ */}
+          <div className="space-y-3 min-w-0">
+
+            {/* Score bar */}
+            <div>
+              <div className="bg-slate-100 rounded-full overflow-hidden h-6 flex">
                 {[
-                  { label: "Structured", value: item.structured_score, weight: 0.35, color: "#3b82f6" },
-                  { label: "Embedding", value: item.embedding_score, weight: 0.35, color: "#10b981" },
-                  { label: "Graph", value: item.graph_score || 0, weight: 0.30, color: "#8b5cf6" },
+                  { label: "Struct", value: item.structured_score, weight: 0.40, color: "#3b82f6" },
+                  { label: "Embed", value: item.embedding_score, weight: 0.40, color: "#10b981" },
+                  { label: "Graph", value: item.graph_score || 0, weight: 0.20, color: "#8b5cf6" },
                 ].map((seg, i) => {
                   const contribution = seg.value * seg.weight * 100;
                   if (contribution < 0.3) return null;
@@ -376,321 +391,260 @@ function SimilarCard({ item, rank, sourceId, sourceName, sourceSf, isSchool, onC
                       className="h-full relative group"
                       initial={{ width: 0 }}
                       animate={{ width: `${contribution}%` }}
-                      transition={{ delay: i * 0.15, duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
+                      transition={{ delay: i * 0.1, duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
                       style={{ backgroundColor: seg.color }}
-                      title={`${seg.label}: ${Math.round(seg.value * 100)}% × ${Math.round(seg.weight * 100)}% weight = ${Math.round(contribution)}pts`}
+                      title={`${seg.label}: ${Math.round(seg.value * 100)}%`}
                     >
-                      <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                        {seg.label}: {Math.round(seg.value * 100)}% × {Math.round(seg.weight * 100)}%w
-                      </div>
                       {contribution > 5 && (
-                        <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white/90">
-                          +{Math.round(contribution)}
-                        </span>
+                        <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white/90">+{Math.round(contribution)}</span>
                       )}
                     </motion.div>
                   );
                 })}
               </div>
-            </div>
-            {/* Legend */}
-            <div className="flex items-center gap-3 text-[9px]">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-blue-500" />Structured {Math.round(item.structured_score * 35)}pts</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-500" />Embedding {Math.round(item.embedding_score * 35)}pts</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-purple-500" />Graph {Math.round((item.graph_score || 0) * 30)}pts</span>
-            </div>
-            {/* Summary stats */}
-            <div className="pt-1 border-t border-slate-100 flex items-center gap-3 text-[10px]">
-              <span className="text-slate-400">Fields:</span>
-              <span className="font-bold text-slate-600">{matchCount}/{totalComp} match</span>
-              {(overlapItems.length + sourceOnly.length + targetOnly.length) > 0 && (
-                <>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-slate-400">{listLabel}:</span>
-                  <span className="font-bold text-slate-600">{overlapItems.length}/{overlapItems.length + sourceOnly.length + targetOnly.length} shared</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ── 2. Highlighted description comparison ── */}
-        {(sourceDesc || targetDesc) && (
-          <div>
-            <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold mb-2">
-              Description Comparison
-              {sharedWordCount > 0 && <span className="ml-2 text-emerald-500 normal-case">{sharedWordCount} shared concepts highlighted</span>}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-blue-50/30 rounded-xl p-3 border border-blue-100/40">
-                <div className="text-[9px] text-blue-500 font-semibold mb-1.5">{sourceName}</div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">{highlightSharedWords(sourceDesc, sharedWordSet)}</p>
-              </div>
-              <div className="bg-purple-50/30 rounded-xl p-3 border border-purple-100/40">
-                <div className="text-[9px] text-purple-500 font-semibold mb-1.5">{item.entity_name}</div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">{highlightSharedWords(targetDesc, sharedWordSet)}</p>
+              <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-blue-500" />Struct {Math.round(item.structured_score * 40)}</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-500" />Embed {Math.round(item.embedding_score * 40)}</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-purple-500" />Graph {Math.round((item.graph_score || 0) * 20)}</span>
+                <span className="ml-auto font-semibold text-slate-500">{matchCount}/{totalComp} fields</span>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* ── 3. Field Match DNA (animated connections) ── */}
-        <div>
-          <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold mb-2">Field Comparison</div>
-          <div className="space-y-2">
-            {comparisons.map((c, i) => {
-              const matchStyle = c.match
-                ? { stroke: "#34d399", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" }
-                : { stroke: "#f87171", bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-400", badge: "bg-red-50 text-red-500 border-red-200" };
-              return (
-                <motion.div
+            {/* Field pills */}
+            <div className="flex flex-wrap gap-1.5">
+              {comparisons.map((c) => (
+                <span
                   key={c.label}
-                  className="flex items-center gap-2"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.08, duration: 0.35 }}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border ${
+                    c.match ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-50 text-slate-400 border-slate-200"
+                  }`}
                 >
-                  {/* Source value */}
-                  <div className="w-[38%] text-right">
-                    <span className="text-[9px] text-slate-400 block">{c.label}</span>
-                    <span className={`text-[11px] font-semibold inline-block px-2 py-0.5 rounded-md border ${c.match ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-slate-50 border-slate-200 text-slate-400"} truncate max-w-full`}>
-                      {c.source}
-                    </span>
-                  </div>
+                  <span className="text-[9px]">{c.match ? "✓" : "✗"}</span>
+                  {c.label}: {c.source}
+                </span>
+              ))}
+            </div>
 
-                  {/* Animated connecting line + match indicator */}
-                  <div className="flex-1 flex items-center justify-center relative min-w-[70px]">
-                    <svg className="w-full h-5 overflow-visible" viewBox="0 0 100 20" preserveAspectRatio="none">
-                      <motion.path
-                        d="M 2 10 C 30 10, 70 10, 98 10"
-                        fill="none"
-                        stroke={matchStyle.stroke}
-                        strokeWidth={c.match ? 2 : 1.2}
-                        strokeDasharray={c.match ? "none" : "5 4"}
-                        strokeLinecap="round"
-                        initial={{ pathLength: 0, opacity: 0 }}
-                        animate={{ pathLength: 1, opacity: 1 }}
-                        transition={{ delay: 0.2 + i * 0.12, duration: 0.5, ease: "easeOut" }}
-                      />
-                    </svg>
-                    <motion.span
-                      className={`absolute text-[8px] font-bold px-1.5 py-0.5 rounded-full border ${matchStyle.badge}`}
-                      initial={{ opacity: 0, scale: 0 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.5 + i * 0.12, duration: 0.25 }}
-                    >
-                      {c.match ? "✓" : "✗"}
-                    </motion.span>
+            {/* Description comparison */}
+            {(sourceDesc || targetDesc) && (
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mb-1.5">
+                  Description {sharedWordCount > 0 && <span className="text-emerald-500 normal-case">{sharedWordCount} shared</span>}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-blue-50/30 rounded-lg p-2 border border-blue-100/40">
+                    <p className="text-[12px] text-slate-500 leading-relaxed line-clamp-3">{highlightSharedWords(sourceDesc, sharedWordSet)}</p>
                   </div>
+                  <div className="bg-purple-50/30 rounded-lg p-2 border border-purple-100/40">
+                    <p className="text-[12px] text-slate-500 leading-relaxed line-clamp-3">{highlightSharedWords(targetDesc, sharedWordSet)}</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
-                  {/* Target value */}
-                  <div className="w-[38%]">
-                    <span className="text-[9px] text-slate-400 block">{c.label}</span>
-                    <span className={`text-[11px] font-semibold inline-block px-2 py-0.5 rounded-md border ${c.match ? "bg-purple-50 border-purple-200 text-purple-700" : "bg-slate-50 border-slate-200 text-slate-400"} truncate max-w-full`}>
-                      {c.target}
-                    </span>
-                  </div>
-                </motion.div>
-              );
-            })}
+            {/* Overlap tags */}
+            {(overlapItems.length > 0 || sourceOnly.length > 0 || targetOnly.length > 0) && (
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mb-1.5">
+                  {listLabel} <span className="text-emerald-500 normal-case">{overlapItems.length}/{overlapItems.length + sourceOnly.length + targetOnly.length} shared</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {overlapItems.map((t) => (
+                    <span key={t} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">{t}</span>
+                  ))}
+                  {sourceOnly.map((t) => (
+                    <span key={`s-${t}`} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-400 ring-1 ring-blue-100">{t}</span>
+                  ))}
+                  {targetOnly.map((t) => (
+                    <span key={`t-${t}`} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-50 text-purple-400 ring-1 ring-purple-100">{t}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* AI button */}
+            <InlineAIAnalysis sourceName={sourceName} targetName={item.entity_name} score={score} />
           </div>
         </div>
-
-        {/* ── 4. Audience/list overlap visualization ── */}
-        {(overlapItems.length > 0 || sourceOnly.length > 0 || targetOnly.length > 0) && (
-          <div>
-            <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold mb-2">{listLabel} Overlap</div>
-            {/* Proportional overlap bar */}
-            <div className="flex h-5 rounded-full overflow-hidden mb-2">
-              {sourceOnly.length > 0 && (
-                <div className="bg-blue-200 flex items-center justify-center" style={{ flex: sourceOnly.length }}>
-                  <span className="text-[8px] text-blue-700 font-bold">{sourceOnly.length}</span>
-                </div>
-              )}
-              {overlapItems.length > 0 && (
-                <div className="bg-emerald-300 flex items-center justify-center" style={{ flex: overlapItems.length }}>
-                  <span className="text-[8px] text-emerald-800 font-bold">{overlapItems.length} shared</span>
-                </div>
-              )}
-              {targetOnly.length > 0 && (
-                <div className="bg-purple-200 flex items-center justify-center" style={{ flex: targetOnly.length }}>
-                  <span className="text-[8px] text-purple-700 font-bold">{targetOnly.length}</span>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {overlapItems.map((t) => (
-                <span key={t} className="px-2 py-0.5 rounded-full text-[9px] font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">{t}</span>
-              ))}
-              {sourceOnly.map((t) => (
-                <span key={`s-${t}`} className="px-2 py-0.5 rounded-full text-[9px] font-medium bg-blue-50 text-blue-400 ring-1 ring-blue-200">{t}</span>
-              ))}
-              {targetOnly.map((t) => (
-                <span key={`t-${t}`} className="px-2 py-0.5 rounded-full text-[9px] font-medium bg-purple-50 text-purple-400 ring-1 ring-purple-200">{t}</span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── 5. Market positioning comparison ── */}
-        {(sourcePos || targetPos) && (
-          <div>
-            <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold mb-2">Market Positioning</div>
-            <div className="grid grid-cols-2 gap-3">
-              <p className="text-[10px] text-slate-500 leading-relaxed bg-blue-50/30 rounded-lg p-2.5 border border-blue-100/40">
-                {highlightSharedWords(sourcePos.slice(0, 200) + (sourcePos.length > 200 ? "…" : ""), sharedWordSet)}
-              </p>
-              <p className="text-[10px] text-slate-500 leading-relaxed bg-purple-50/30 rounded-lg p-2.5 border border-purple-100/40">
-                {highlightSharedWords(targetPos.slice(0, 200) + (targetPos.length > 200 ? "…" : ""), sharedWordSet)}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* ── 6. Knowledge Graph Connection ── */}
-        <GraphConnection
-          entityType={isSchool ? "school" : "product"}
-          sourceId={sourceId}
-          sourceName={sourceName}
-          targetId={item.entity_id}
-          targetName={item.entity_name}
-        />
-
-        {/* ── 7. AI Inline Analysis ── */}
-        <InlineAIAnalysis sourceName={sourceName} targetName={item.entity_name} score={score} />
       </div>
     </div>
   );
 }
 
-// ─── Graph Connection ────────────────────────────────────────────────────────
 
-function GraphConnection({ entityType, sourceId, sourceName, targetId, targetName }: {
-  entityType: string; sourceId: string; sourceName: string; targetId: string; targetName: string;
+// ─── Mini Force Graph ─────────────────────────────────────────────────────────
+
+function MiniForceGraph({ sourceName, targetName, sharedNodes }: {
+  sourceName: string; targetName: string; sharedNodes: string[];
 }) {
-  const [nodes, setNodes] = useState<any[]>([]);
-  const [links, setLinks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const fgRef = useRef<any>(null);
+  const [containerWidth, setContainerWidth] = useState(320);
+
+  const COLORS: Record<string, string> = { source: "#3b82f6", target: "#8b5cf6", shared: "#10b981" };
+  const graphH = 240;
+
+  const graphData = useMemo(() => {
+    const trunc = (s: string, n: number) => s.length > n ? s.slice(0, n - 1) + "…" : s;
+    const nodes: any[] = [
+      { id: "src", label: trunc(sourceName, 18), group: "source" },
+      { id: "tgt", label: trunc(targetName, 18), group: "target" },
+    ];
+    const links: any[] = [];
+    for (const name of sharedNodes.slice(0, 6)) {
+      const id = `s-${name}`;
+      nodes.push({ id, label: name, group: "shared" });
+      links.push({ source: "src", target: id });
+      links.push({ source: id, target: "tgt" });
+    }
+    return { nodes, links };
+  }, [sourceName, targetName, sharedNodes]);
 
   useEffect(() => {
-    if (!sourceId || !targetId) { setLoading(false); return; }
-    // Fetch neighbors for both entities at depth 1 and find shared connections
-    Promise.all([
-      fetch(`/api/graph/neighbors/${entityType}/${sourceId}?depth=1`).then(r => r.json()),
-      fetch(`/api/graph/neighbors/${entityType}/${targetId}?depth=1`).then(r => r.json()),
-    ]).then(([srcData, tgtData]) => {
-      const srcNodes = new Map((srcData.nodes || []).map((n: any) => [n.id, n]));
-      const tgtNodes = new Map((tgtData.nodes || []).map((n: any) => [n.id, n]));
+    if (!containerRef.current) return;
+    const obs = new ResizeObserver(entries => {
+      for (const e of entries) setContainerWidth(e.contentRect.width);
+    });
+    obs.observe(containerRef.current);
+    setContainerWidth(containerRef.current.offsetWidth || 320);
+    return () => obs.disconnect();
+  }, []);
 
-      // Find shared intermediate nodes (not the entities themselves)
-      const srcEntityId = `${entityType === "school" ? "School" : "Product"}_${sourceId}`;
-      const tgtEntityId = `${entityType === "school" ? "School" : "Product"}_${targetId}`;
-
-      const sharedIds = [...srcNodes.keys()].filter(id => tgtNodes.has(id) && id !== srcEntityId && id !== tgtEntityId);
-
-      // Build a mini graph: source → shared nodes → target
-      const graphNodes: any[] = [
-        { id: "source", label: sourceName, type: entityType === "school" ? "School" : "Product" },
-        { id: "target", label: targetName, type: entityType === "school" ? "School" : "Product" },
-      ];
-      const graphLinks: any[] = [];
-
-      for (const sid of sharedIds) {
-        const node = srcNodes.get(sid) || tgtNodes.get(sid);
-        if (node) {
-          graphNodes.push({ id: sid, label: node.label || sid, type: node.type || "Node" });
-          graphLinks.push({ source: "source", target: sid });
-          graphLinks.push({ source: sid, target: "target" });
+  useEffect(() => {
+    if (!fgRef.current) return;
+    // Spread nodes apart to fill the space
+    fgRef.current.d3Force("link")?.distance(60);
+    fgRef.current.d3Force("charge")?.strength(-200);
+    // Zoom to fit then push camera closer
+    const timers = [
+      setTimeout(() => fgRef.current?.zoomToFit(400, 5), 400),
+      setTimeout(() => fgRef.current?.zoomToFit(400, 5), 1000),
+      setTimeout(() => {
+        // After layout settles, nudge camera 30% closer
+        if (fgRef.current) {
+          const cam = fgRef.current.camera();
+          if (cam) {
+            const dist = cam.position.length();
+            const ratio = 0.7;
+            fgRef.current.cameraPosition(
+              { x: cam.position.x * ratio, y: cam.position.y * ratio, z: cam.position.z * ratio },
+              { x: 0, y: 0, z: 0 },
+              500
+            );
+          }
         }
-      }
-
-      setNodes(graphNodes);
-      setLinks(graphLinks);
-    }).catch(() => {
-      setNodes([]);
-      setLinks([]);
-    }).finally(() => setLoading(false));
-  }, [entityType, sourceId, targetId, sourceName, targetName]);
-
-  if (loading) return null;
-  if (nodes.length <= 2) return null; // No shared graph connections
-
-  const sharedNodes = nodes.filter(n => n.id !== "source" && n.id !== "target");
-
-  const NODE_COLORS: Record<string, string> = {
-    School: "#3b82f6", Product: "#8b5cf6", Phase: "#6366f1",
-    Region: "#06b6d4", Subject: "#f59e0b", Category: "#10b981", Trust: "#64748b",
-  };
+      }, 1800),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, [graphData]);
 
   return (
-    <div>
-      <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
-        </svg>
-        Knowledge Graph Path
-        <span className="text-emerald-500 normal-case font-medium">{sharedNodes.length} shared connection{sharedNodes.length !== 1 ? "s" : ""}</span>
+    <div className="w-full">
+      <div className="text-[9px] text-slate-400 uppercase tracking-widest font-semibold text-center mb-1.5 flex items-center justify-center gap-1.5">
+        <span className="h-px flex-1 bg-slate-200" />
+        <span>Shared via graph</span>
+        <span className="h-px flex-1 bg-slate-200" />
       </div>
-      <div className="bg-slate-50/60 rounded-xl p-3 border border-slate-100">
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Source node */}
-          <motion.span
-            className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-200 shrink-0"
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-          >
-            {sourceName.length > 18 ? sourceName.slice(0, 16) + "…" : sourceName}
-          </motion.span>
+      <div ref={containerRef} className="rounded-xl overflow-hidden border border-slate-200 bg-white" style={{ height: graphH }}>
+        <ForceGraph3D
+          ref={fgRef}
+          graphData={graphData}
+          width={containerWidth}
+          height={graphH}
+          backgroundColor="#ffffff"
+          nodeVal={(node: any) => node.group === "shared" ? 6 : 12}
+          nodeOpacity={1}
+          linkColor={() => "#94a3b8"}
+          linkWidth={2}
+          linkCurvature={0.15}
+          d3AlphaDecay={0.04}
+          d3VelocityDecay={0.25}
+          warmupTicks={60}
+          cooldownTicks={100}
+          enableNodeDrag={true}
+          enableNavigationControls={true}
+          showNavInfo={false}
+          linkDirectionalParticles={2}
+          linkDirectionalParticleWidth={2}
+          linkDirectionalParticleSpeed={0.004}
+          linkDirectionalParticleColor={() => "#8b5cf650"}
+          nodeThreeObject={(node: any) => {
+            const THREE = require("three");
+            const group = new THREE.Group();
+            const color = COLORS[node.group] || "#64748b";
+            const isEntity = node.group !== "shared";
+            const size = isEntity ? 8 : 5;
 
-          <motion.svg className="w-4 h-4 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-          </motion.svg>
-
-          {/* Shared intermediate nodes */}
-          {sharedNodes.map((node, i) => {
-            const color = NODE_COLORS[node.type] || "#94a3b8";
-            return (
-              <motion.span
-                key={node.id}
-                className="px-2 py-0.5 rounded-lg text-[10px] font-semibold border shrink-0"
-                style={{ backgroundColor: `${color}15`, color: color, borderColor: `${color}40` }}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.15 + i * 0.08 }}
-              >
-                {node.label}
-              </motion.span>
+            // Sphere with nice material
+            const sphere = new THREE.Mesh(
+              new THREE.SphereGeometry(size, 32, 32),
+              new THREE.MeshPhongMaterial({ color, shininess: 120, transparent: true, opacity: 0.95 })
             );
-          })}
+            group.add(sphere);
 
-          <motion.svg className="w-4 h-4 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 + sharedNodes.length * 0.08 }}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-          </motion.svg>
+            // Glow halo
+            const halo = new THREE.Mesh(
+              new THREE.SphereGeometry(size * 1.5, 16, 16),
+              new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.06 })
+            );
+            group.add(halo);
 
-          {/* Target node */}
-          <motion.span
-            className="px-2.5 py-1 bg-purple-100 text-purple-700 rounded-lg text-[10px] font-bold border border-purple-200 shrink-0"
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 + sharedNodes.length * 0.08 }}
-          >
-            {targetName.length > 18 ? targetName.slice(0, 16) + "…" : targetName}
-          </motion.span>
-        </div>
+            // Text label — large, high-res canvas
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d")!;
+            canvas.width = 1024;
+            canvas.height = 256;
+            ctx.clearRect(0, 0, 1024, 256);
 
-        {/* Node type legend */}
-        {sharedNodes.length > 0 && (
-          <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200/40">
-            {[...new Set(sharedNodes.map(n => n.type))].map(type => (
-              <span key={type} className="flex items-center gap-1 text-[9px] text-slate-400">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: NODE_COLORS[type] || "#94a3b8" }} />
-                {type}
-              </span>
-            ))}
-          </div>
-        )}
+            const label = node.label;
+            const mainFont = isEntity ? "bold 56px system-ui, sans-serif" : "bold 46px system-ui, sans-serif";
+            const subFont = isEntity ? "36px system-ui, sans-serif" : "32px system-ui, sans-serif";
+            ctx.font = mainFont;
+            const tw = ctx.measureText(label).width;
+            const pillW = Math.max(tw + 48, 200);
+            const pillH = isEntity ? 100 : 80;
+
+            // White pill background with colored border
+            ctx.fillStyle = "rgba(255,255,255,0.92)";
+            ctx.beginPath();
+            ctx.roundRect(512 - pillW / 2, 8, pillW, pillH, 16);
+            ctx.fill();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.roundRect(512 - pillW / 2, 8, pillW, pillH, 16);
+            ctx.stroke();
+
+            // Label text
+            ctx.font = mainFont;
+            ctx.textAlign = "center";
+            ctx.fillStyle = isEntity ? "#0f172a" : "#334155";
+            ctx.fillText(label, 512, isEntity ? 68 : 58);
+
+            // Type subtitle
+            if (isEntity) {
+              ctx.font = subFont;
+              ctx.fillStyle = color;
+              ctx.fillText(node.group === "source" ? "Source" : "Target", 512, isEntity ? 150 : 130);
+            } else {
+              ctx.font = subFont;
+              ctx.fillStyle = "#10b981";
+              ctx.fillText("shared need", 512, 130);
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            const sprite = new THREE.Sprite(
+              new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false })
+            );
+            sprite.scale.set(isEntity ? 70 : 55, isEntity ? 13 : 10, 1);
+            sprite.position.y = -(size + 10);
+            group.add(sprite);
+
+            return group;
+          }}
+          nodeLabel={() => ""}
+        />
       </div>
     </div>
   );
@@ -701,7 +655,7 @@ function GraphConnection({ entityType, sourceId, sourceName, targetId, targetNam
 function SimilarityRadar({ dims, size }: { dims: { label: string; value: number }[]; size: number }) {
   const cx = size / 2;
   const cy = size / 2;
-  const r = size / 2 - 28;
+  const r = size / 2 - 32;
   const n = dims.length;
 
   const pointAt = (i: number, val: number) => {
@@ -740,7 +694,7 @@ function SimilarityRadar({ dims, size }: { dims: { label: string; value: number 
       {dims.map((d, i) => {
         const p = pointAt(i, 1.22);
         return (
-          <text key={i} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" fontSize={7.5} fontWeight={500} fill={d.value > 0.5 ? "#065f46" : "#94a3b8"}>
+          <text key={i} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" fontSize={10} fontWeight={600} fill={d.value > 0.5 ? "#065f46" : "#94a3b8"}>
             {d.label}
           </text>
         );

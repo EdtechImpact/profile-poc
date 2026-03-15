@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { motion } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
 
@@ -39,7 +40,7 @@ function formatValue(val: unknown): string {
   return String(val);
 }
 
-export default function MatchDNA({ schoolFields, productFields, breakdown }: MatchDNAProps) {
+export default React.memo(function MatchDNA({ schoolFields, productFields, breakdown }: MatchDNAProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [positions, setPositions] = useState<{ left: DOMRect[]; right: DOMRect[] } | null>(null);
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
@@ -223,4 +224,4 @@ export default function MatchDNA({ schoolFields, productFields, breakdown }: Mat
       </div>
     </div>
   );
-}
+});

@@ -448,8 +448,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { thread_id, message, entity_context } = body;
 
-  if (!message || typeof message !== "string") {
-    return new Response(JSON.stringify({ error: "Message is required" }), {
+  if (!message || typeof message !== "string" || message.length > 10000) {
+    return new Response(JSON.stringify({ error: "Message is required and must be under 10,000 characters" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
@@ -711,7 +711,6 @@ export async function POST(req: NextRequest) {
 
         enqueue({ type: "done", thread_id: currentThreadId });
       } catch (error) {
-        console.error("Chat error:", error);
         const msg = error instanceof Error ? error.message : "Unknown error";
         enqueue({ type: "error", error: msg });
       } finally {

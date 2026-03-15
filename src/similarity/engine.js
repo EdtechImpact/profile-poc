@@ -3,9 +3,9 @@ import { getNodeSimilarity } from "../lib/neo4j.js";
 import { computeStructuredScore } from "./structured-scorer.js";
 
 const WEIGHTS = {
-  structured: 0.35,
-  embedding: 0.35,
-  graph: 0.30,
+  structured: 0.40,
+  embedding: 0.40,
+  graph: 0.20, // Now measures non-redundant signals only (tech needs / school type targeting)
 };
 
 export async function findSimilarEntities(entityType, entityId, { top = 10, includeGraph = true } = {}) {
@@ -63,6 +63,7 @@ export async function findSimilarEntities(entityType, entityId, { top = 10, incl
         const existing = candidateMap.get(c.entity_id);
         if (existing) {
           existing.graph_score = c.graph_score || 0;
+          existing.shared_graph_nodes = c.shared_names || [];
         } else {
           candidateMap.set(c.entity_id, {
             entity_id: c.entity_id,
@@ -71,27 +72,41 @@ export async function findSimilarEntities(entityType, entityId, { top = 10, incl
             profile_text: null,
             embedding_score: 0,
             graph_score: c.graph_score || 0,
+            shared_graph_nodes: c.shared_names || [],
           });
         }
       }
     } catch (e) {
-      console.warn("Graph scoring unavailable:", e.message);
+      // Graph scoring unavailable — continue without it
     }
   }
 
-  // 3. Compute full hybrid scores
+  // 3. Batch-fetch missing profiles to avoid N+1
+  const missingIds = [...candidateMap.entries()]
+    .filter(([, c]) => !c.structured_fields)
+    .map(([id]) => id);
+
+  if (missingIds.length > 0) {
+    const missingProfiles = await Promise.all(
+      missingIds.map((id) => getProfile(entityType, id))
+    );
+    for (let i = 0; i < missingIds.length; i++) {
+      const profile = missingProfiles[i];
+      const candidate = candidateMap.get(missingIds[i]);
+      if (candidate && profile) {
+        candidate.structured_fields = profile.structured_fields || {};
+        candidate.entity_name = candidate.entity_name || profile.entity_name;
+        candidate.profile_text = profile.profile_text;
+      }
+    }
+  }
+
+  // 4. Compute full hybrid scores
   const results = [];
   const sourceFields = source.structured_fields || {};
 
   for (const [candidateId, candidate] of candidateMap) {
-    // Get structured fields if not yet loaded
-    let candidateFields = candidate.structured_fields;
-    if (!candidateFields) {
-      const profile = await getProfile(entityType, candidateId);
-      candidateFields = profile?.structured_fields || {};
-      candidate.entity_name = candidate.entity_name || profile?.entity_name;
-      candidate.profile_text = profile?.profile_text;
-    }
+    const candidateFields = candidate.structured_fields || {};
 
     // Structured score
     const structured = computeStructuredScore(entityType, sourceFields, candidateFields);
@@ -125,6 +140,7 @@ export async function findSimilarEntities(entityType, entityId, { top = 10, incl
       structured_score: Math.round(structuredScore * 10000) / 10000,
       embedding_score: Math.round(embeddingScore * 10000) / 10000,
       graph_score: Math.round(graphScore * 10000) / 10000,
+      shared_graph_nodes: candidate.shared_graph_nodes || [],
       explanation,
     });
   }

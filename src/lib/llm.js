@@ -53,14 +53,14 @@ Return ONLY a valid JSON object with the field names as keys. No explanation, no
   // Parse JSON from response, handling possible markdown wrapping
   const jsonMatch = responseText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    console.error("Failed to parse LLM response:", responseText);
+    // Failed to parse LLM response
     return {};
   }
 
   try {
     return JSON.parse(jsonMatch[0]);
   } catch (e) {
-    console.error("JSON parse error:", e.message, responseText);
+    // JSON parse error from LLM response
     return {};
   }
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
@@ -29,7 +30,7 @@ function guessNodeType(name: string): string {
   return "default";
 }
 
-export default function GraphBridge({ schoolName, schoolId, productName, productId, sharedNodes }: GraphBridgeProps) {
+export default React.memo(function GraphBridge({ schoolName, schoolId, productName, productId, sharedNodes }: GraphBridgeProps) {
   if (!sharedNodes || sharedNodes.length === 0) return null;
 
   return (
@@ -113,4 +114,4 @@ export default function GraphBridge({ schoolName, schoolId, productName, product
       </div>
     </div>
   );
-}
+});

@@ -11,6 +11,9 @@ export function getPool() {
       connectionString:
         process.env.DATABASE_URL ||
         "postgresql://poc:poc_local@localhost:5432/profile_poc",
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
     });
   }
   return pool;
@@ -72,13 +75,15 @@ export async function getProfile(entityType, entityId) {
 }
 
 export async function searchProfiles(entityType, searchTerm, limit = 20) {
+  // Escape LIKE special characters to prevent wildcard injection
+  const escaped = searchTerm.replace(/[%_\\]/g, (ch) => `\\${ch}`);
   const result = await query(
     `SELECT id, entity_type, entity_id, entity_name, schema_version, structured_fields, profile_text, profiled_at
      FROM entity_profiles
      WHERE entity_type = $1 AND (entity_name ILIKE $2 OR entity_id ILIKE $2)
      ORDER BY entity_name
      LIMIT $3`,
-    [entityType, `%${searchTerm}%`, limit]
+    [entityType, `%${escaped}%`, limit]
   );
   return result.rows;
 }

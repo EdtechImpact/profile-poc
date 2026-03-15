@@ -100,6 +100,18 @@ export async function syncSchoolToGraph(profile) {
       { trust: fields.trust_name, urn: profile.entity_id }
     );
   }
+
+  // Connect to tech needs (non-redundant with structured scoring)
+  const techNeeds = fields.likely_tech_needs || [];
+  for (const need of techNeeds) {
+    await runCypher(
+      `MERGE (tn:TechNeed {name: $need})
+       WITH tn
+       MATCH (s:School {urn: $urn})
+       MERGE (s)-[:NEEDS_TECH]->(tn)`,
+      { need, urn: profile.entity_id }
+    );
+  }
 }
 
 export async function syncProductToGraph(profile) {
@@ -171,6 +183,18 @@ export async function syncProductToGraph(profile) {
        MERGE (alt:Product {slug: $altSlug})
        MERGE (p)-[:ALTERNATIVE_TO]->(alt)`,
       { slug: profile.entity_id, altSlug }
+    );
+  }
+
+  // Connect to target school types (non-redundant with structured scoring)
+  const schoolTypes = fields.target_school_type || [];
+  for (const st of schoolTypes) {
+    await runCypher(
+      `MERGE (st:SchoolType {name: $st})
+       WITH st
+       MATCH (p:Product {slug: $slug})
+       MERGE (p)-[:TARGETS_SCHOOL_TYPE]->(st)`,
+      { st, slug: profile.entity_id }
     );
   }
 }
@@ -328,20 +352,26 @@ export async function findPathBetween(entityType, fromId, toId) {
 export async function getNodeSimilarity(entityType, entityId, limit = 20) {
   const { nodeLabel, idField } = resolveEntityLabel(entityType);
 
-  // Use Jaccard similarity based on shared relationships
+  // Use Jaccard similarity based on NON-REDUNDANT relationships only
+  // Schools: NEEDS_TECH (tech needs overlap — not in structured scoring)
+  // Products: TARGETS_SCHOOL_TYPE + ALTERNATIVE_TO (not in structured scoring)
+  const relTypes = entityType === "school"
+    ? "NEEDS_TECH"
+    : "TARGETS_SCHOOL_TYPE|ALTERNATIVE_TO";
+
   const records = await runCypher(
-    `MATCH (n:${nodeLabel} {${idField}: $id})-[:IS_PHASE|IN_REGION|IN_TRUST|IN_CATEGORY|COVERS_SUBJECT]->(shared)
+    `MATCH (n:${nodeLabel} {${idField}: $id})-[:${relTypes}]->(shared)
      WITH n, collect(shared) AS n_neighbors
-     MATCH (other:${nodeLabel})-[:IS_PHASE|IN_REGION|IN_TRUST|IN_CATEGORY|COVERS_SUBJECT]->(shared)
+     MATCH (other:${nodeLabel})-[:${relTypes}]->(shared2)
      WHERE other <> n
-     WITH n, other, n_neighbors, collect(shared) AS other_neighbors
+     WITH other, n_neighbors, collect(shared2) AS other_neighbors
      WITH other,
           [x IN n_neighbors WHERE x IN other_neighbors] AS intersection,
           n_neighbors + [x IN other_neighbors WHERE NOT x IN n_neighbors] AS union_set
-     WITH other,
-          toFloat(size(intersection)) / toFloat(size(union_set)) AS jaccard
-     WHERE jaccard > 0
-     RETURN other.${idField} AS entity_id, other.name AS entity_name, jaccard
+     WHERE size(intersection) > 0
+     RETURN other.${idField} AS entity_id, other.name AS entity_name,
+            toFloat(size(intersection)) / toFloat(size(union_set)) AS jaccard,
+            [x IN intersection | x.name] AS shared_names
      ORDER BY jaccard DESC
      LIMIT $limit`,
     { id: entityId, limit: neo4j.int(limit) }
@@ -351,6 +381,7 @@ export async function getNodeSimilarity(entityType, entityId, limit = 20) {
     entity_id: r.get("entity_id"),
     entity_name: r.get("entity_name"),
     graph_score: r.get("jaccard"),
+    shared_names: r.get("shared_names") || [],
   }));
 }
 
@@ -359,9 +390,10 @@ export async function findCrossTypeMatches(sourceType, sourceId, limit = 50) {
   const targetType = sourceType === "school" ? "product" : "school";
   const { nodeLabel: targetLabel, idField: targetIdField } = resolveEntityLabel(targetType);
 
+  // Cross-type: use all relationships since school→product matching is inherently different
   const records = await runCypher(
     `MATCH (s:${sourceLabel} {${sourceIdField}: $id})-[]->(shared)<-[]-(t:${targetLabel})
-     WITH t, count(shared) AS shared_count, collect(shared.name) AS shared_nodes
+     WITH t, count(DISTINCT shared) AS shared_count, collect(DISTINCT shared.name) AS shared_nodes
      RETURN t.${targetIdField} AS entity_id, t.name AS entity_name,
             toFloat(shared_count) / 5.0 AS graph_score, shared_nodes
      ORDER BY shared_count DESC
@@ -410,7 +442,7 @@ export async function getCommunities(entityType) {
   const { nodeLabel, idField } = resolveEntityLabel(entityType);
 
   const records = await runCypher(
-    `MATCH (n:${nodeLabel})-[:IS_PHASE|IN_REGION|IN_TRUST|IN_CATEGORY|COVERS_SUBJECT]->(shared)<-[:IS_PHASE|IN_REGION|IN_TRUST|IN_CATEGORY|COVERS_SUBJECT]-(m:${nodeLabel})
+    `MATCH (n:${nodeLabel})-[:IS_PHASE|IN_REGION|IN_TRUST|IN_CATEGORY|COVERS_SUBJECT|NEEDS_TECH|TARGETS_SCHOOL_TYPE]->(shared)<-[:IS_PHASE|IN_REGION|IN_TRUST|IN_CATEGORY|COVERS_SUBJECT|NEEDS_TECH|TARGETS_SCHOOL_TYPE]-(m:${nodeLabel})
      WHERE n <> m
      WITH shared, collect(DISTINCT n.${idField}) AS members
      WHERE size(members) > 1

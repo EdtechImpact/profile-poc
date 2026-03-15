@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
@@ -15,7 +15,7 @@ interface PeerData {
   peer_count: number;
 }
 
-export default function PeerContext({ schoolId, matchedProductIds = [] }: PeerContextProps) {
+export default React.memo(function PeerContext({ schoolId, matchedProductIds = [] }: PeerContextProps) {
   const [data, setData] = useState<PeerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -131,4 +131,4 @@ export default function PeerContext({ schoolId, matchedProductIds = [] }: PeerCo
       )}
     </div>
   );
-}
+});

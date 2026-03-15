@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export interface HybridWeights {
@@ -71,7 +71,7 @@ function adjustWeights<T extends Record<string, number>>(weights: T, changedKey:
   return result;
 }
 
-export default function WeightTuner({ hybridWeights, dimensionWeights, onHybridChange, onDimensionChange, onReset }: WeightTunerProps) {
+export default React.memo(function WeightTuner({ hybridWeights, dimensionWeights, onHybridChange, onDimensionChange, onReset }: WeightTunerProps) {
   const [open, setOpen] = useState(false);
 
   const isDefault =
@@ -196,4 +196,4 @@ export default function WeightTuner({ hybridWeights, dimensionWeights, onHybridC
       </AnimatePresence>
     </div>
   );
-}
+});

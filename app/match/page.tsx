@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
+import React, { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -123,7 +123,7 @@ function MatchPage() {
     (r) => Math.round(r.custom_score * 100) >= minScore
   );
 
-  const exportCSV = () => {
+  const exportCSV = useCallback(() => {
     const headers = ["Rank", "Name", "Type", "Match Score", "Structured", "Embedding", "Graph"];
     const rows = filteredRecs.map((r, i) => [
       i + 1,
@@ -142,15 +142,15 @@ function MatchPage() {
     a.download = `recommendations-${sourceType}-${sourceId}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }, [filteredRecs, sourceType, sourceId]);
 
-  const handleExplain = (rec: Recommendation) => {
+  const handleExplain = useCallback((rec: Recommendation) => {
     const schoolId = sourceType === "school" ? sourceId : rec.entity_id;
     const productId = sourceType === "school" ? rec.entity_id : sourceId;
     const schoolName = sourceType === "school" ? sourceName : rec.entity_name;
     const productName = sourceType === "school" ? rec.entity_name : sourceName;
     setExplainTarget({ schoolId, productId, schoolName, productName });
-  };
+  }, [sourceType, sourceId, sourceName]);
 
   return (
     <div className="max-w-7xl mx-auto animate-fade-in">
@@ -378,7 +378,7 @@ function MatchPage() {
   );
 }
 
-function RecommendationCard({
+const RecommendationCard = React.memo(function RecommendationCard({
   rec,
   rank,
   sourceType,
@@ -651,4 +651,4 @@ function RecommendationCard({
       </AnimatePresence>
     </div>
   );
-}
+});

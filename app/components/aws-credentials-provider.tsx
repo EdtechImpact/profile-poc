@@ -30,7 +30,7 @@ export function AWSCredentialsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = sessionStorage.getItem(STORAGE_KEY);
       if (stored) {
         setCredentialsState(JSON.parse(stored));
       }
@@ -40,12 +40,12 @@ export function AWSCredentialsProvider({ children }: { children: ReactNode }) {
 
   const setCredentials = useCallback((creds: AWSCredentials) => {
     setCredentialsState(creds);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(creds));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(creds));
   }, []);
 
   const clearCredentials = useCallback(() => {
     setCredentialsState(null);
-    localStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(STORAGE_KEY);
   }, []);
 
   const isConfigured = !!(credentials?.accessKeyId && credentials?.secretAccessKey);

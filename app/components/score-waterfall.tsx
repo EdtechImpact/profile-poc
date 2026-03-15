@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { motion } from "framer-motion";
 
 interface WaterfallProps {
@@ -16,7 +17,7 @@ const DIMENSIONS = [
   { key: "sixth_form_alignment", label: "6th Form", color: "#94a3b8", weight: 0.05 },
 ];
 
-export default function ScoreWaterfall({ breakdown, compact = true }: WaterfallProps) {
+export default React.memo(function ScoreWaterfall({ breakdown, compact = true }: WaterfallProps) {
   if (!breakdown || Object.keys(breakdown).length === 0) return null;
 
   const segments = DIMENSIONS.map((dim) => {
@@ -97,4 +98,4 @@ export default function ScoreWaterfall({ breakdown, compact = true }: WaterfallP
       )}
     </div>
   );
-}
+});

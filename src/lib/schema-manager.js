@@ -10,11 +10,32 @@ const SAFE_COMPUTE_RE = /^(?:value\s*[<>=!]+\s*[\d.]+\s*\?\s*'[^']*'\s*:\s*)*'[^
 
 function safeEvaluateCompute(expr, value) {
   if (typeof expr !== "string" || !SAFE_COMPUTE_RE.test(expr.trim())) {
-    throw new Error(`Unsafe compute expression rejected: ${expr}`);
+    throw new Error(`Unsafe compute expression rejected`);
   }
-  // Expression is validated as safe ternary chain — evaluate it
-  const fn = new Function("value", `"use strict"; return ${expr}`);
-  return fn(value);
+  // Parse and evaluate the ternary chain without Function constructor
+  // Pattern: value <op> <num> ? '<result>' : ... '<default>'
+  const trimmed = expr.trim();
+  const parts = trimmed.split(/\s*:\s*/);
+  for (const part of parts) {
+    const condMatch = part.match(/^value\s*([<>=!]+)\s*([\d.]+)\s*\?\s*'([^']*)'\s*$/);
+    if (condMatch) {
+      const [, op, numStr, result] = condMatch;
+      const num = parseFloat(numStr);
+      let passes = false;
+      if (op === "<") passes = value < num;
+      else if (op === "<=") passes = value <= num;
+      else if (op === ">") passes = value > num;
+      else if (op === ">=") passes = value >= num;
+      else if (op === "===" || op === "==") passes = value == num;
+      else if (op === "!==" || op === "!=") passes = value != num;
+      if (passes) return result;
+    } else {
+      // Final default: '<result>'
+      const defaultMatch = part.match(/^'([^']*)'\s*$/);
+      if (defaultMatch) return defaultMatch[1];
+    }
+  }
+  return null;
 }
 
 export function loadSchema(entityType) {
@@ -66,7 +87,7 @@ export function extractComputedFieldsFromRaw(rawData, schema) {
     try {
       result[name] = safeEvaluateCompute(field.compute, value);
     } catch (e) {
-      console.error(`Compute error for ${name}:`, e.message);
+      // Compute evaluation failed — skip this field silently
     }
   }
 

@@ -1,5 +1,7 @@
 "use client";
 
+import React from "react";
+
 interface RadarDimension {
   label: string;
   value: number; // 0–1
@@ -12,7 +14,7 @@ interface RadarChartProps {
   showLabels?: boolean;
 }
 
-export default function RadarChart({
+export default React.memo(function RadarChart({
   dimensions,
   size = 140,
   color = "#5c7cfa",
@@ -140,4 +142,4 @@ export default function RadarChart({
         ))}
     </svg>
   );
-}
+});
