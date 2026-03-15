@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
 
 interface EntityDetailModalProps {
   entityType: "school" | "product";
@@ -353,23 +354,59 @@ function SimilarCard({ item, rank, sourceName, sourceSf, isSchool, onClick }: {
 
         {/* ── 1. Radar + Score breakdown side by side ── */}
         <div className="flex items-start gap-4">
-          {/* Radar chart */}
           <div className="shrink-0">
             <SimilarityRadar dims={radarDims} size={150} />
           </div>
-          <div className="flex-1 min-w-0 space-y-2.5">
-            <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Similarity Breakdown</div>
-            <MiniBar label="Structured" value={item.structured_score} color="bg-blue-400" />
-            <MiniBar label="Embedding" value={item.embedding_score} color="bg-emerald-400" />
-            <MiniBar label="Graph" value={item.graph_score || 0} color="bg-purple-400" />
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">How the score is built</div>
+            {/* Score Waterfall */}
+            <div className="relative">
+              <div className="w-full bg-slate-100 rounded-full overflow-hidden h-6 flex">
+                {[
+                  { label: "Structured", value: item.structured_score, weight: 0.35, color: "#3b82f6" },
+                  { label: "Embedding", value: item.embedding_score, weight: 0.35, color: "#10b981" },
+                  { label: "Graph", value: item.graph_score || 0, weight: 0.30, color: "#8b5cf6" },
+                ].map((seg, i) => {
+                  const contribution = seg.value * seg.weight * 100;
+                  if (contribution < 0.3) return null;
+                  return (
+                    <motion.div
+                      key={seg.label}
+                      className="h-full relative group"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${contribution}%` }}
+                      transition={{ delay: i * 0.15, duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
+                      style={{ backgroundColor: seg.color }}
+                      title={`${seg.label}: ${Math.round(seg.value * 100)}% × ${Math.round(seg.weight * 100)}% weight = ${Math.round(contribution)}pts`}
+                    >
+                      <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                        {seg.label}: {Math.round(seg.value * 100)}% × {Math.round(seg.weight * 100)}%w
+                      </div>
+                      {contribution > 5 && (
+                        <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white/90">
+                          +{Math.round(contribution)}
+                        </span>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Legend */}
+            <div className="flex items-center gap-3 text-[9px]">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-blue-500" />Structured {Math.round(item.structured_score * 35)}pts</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-500" />Embedding {Math.round(item.embedding_score * 35)}pts</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-purple-500" />Graph {Math.round((item.graph_score || 0) * 30)}pts</span>
+            </div>
+            {/* Summary stats */}
             <div className="pt-1 border-t border-slate-100 flex items-center gap-3 text-[10px]">
-              <span className="text-slate-400">Fields matched:</span>
-              <span className="font-bold text-slate-600">{matchCount}/{totalComp}</span>
+              <span className="text-slate-400">Fields:</span>
+              <span className="font-bold text-slate-600">{matchCount}/{totalComp} match</span>
               {(overlapItems.length + sourceOnly.length + targetOnly.length) > 0 && (
                 <>
                   <span className="text-slate-300">|</span>
-                  <span className="text-slate-400">{listLabel} overlap:</span>
-                  <span className="font-bold text-slate-600">{overlapItems.length}/{overlapItems.length + sourceOnly.length + targetOnly.length}</span>
+                  <span className="text-slate-400">{listLabel}:</span>
+                  <span className="font-bold text-slate-600">{overlapItems.length}/{overlapItems.length + sourceOnly.length + targetOnly.length} shared</span>
                 </>
               )}
             </div>
@@ -396,31 +433,65 @@ function SimilarCard({ item, rank, sourceName, sourceSf, isSchool, onClick }: {
           </div>
         )}
 
-        {/* ── 3. Attribute comparison table ── */}
-        <div className="bg-slate-50/60 rounded-xl px-3 py-2">
-          <div className="grid grid-cols-[90px_1fr_20px_1fr] gap-x-2 text-[11px]">
-            {comparisons.map((c) => (
-              <React.Fragment key={c.label}>
-                <div className="text-slate-400 py-1.5 border-b border-white/60 font-medium">{c.label}</div>
-                <div className={`py-1.5 border-b border-white/60 font-medium truncate ${c.match ? "text-slate-700" : "text-slate-400"}`}>{c.source}</div>
-                <div className="py-1.5 border-b border-white/60 flex items-center justify-center">
-                  {c.match ? (
-                    <div className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center">
-                      <svg className="w-2.5 h-2.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                  ) : (
-                    <div className="w-4 h-4 rounded-full bg-rose-50 flex items-center justify-center">
-                      <svg className="w-2.5 h-2.5 text-rose-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                <div className={`py-1.5 border-b border-white/60 font-medium truncate ${c.match ? "text-slate-700" : "text-slate-400"}`}>{c.target}</div>
-              </React.Fragment>
-            ))}
+        {/* ── 3. Field Match DNA (animated connections) ── */}
+        <div>
+          <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold mb-2">Field Comparison</div>
+          <div className="space-y-2">
+            {comparisons.map((c, i) => {
+              const matchStyle = c.match
+                ? { stroke: "#34d399", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" }
+                : { stroke: "#f87171", bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-400", badge: "bg-red-50 text-red-500 border-red-200" };
+              return (
+                <motion.div
+                  key={c.label}
+                  className="flex items-center gap-2"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.08, duration: 0.35 }}
+                >
+                  {/* Source value */}
+                  <div className="w-[38%] text-right">
+                    <span className="text-[9px] text-slate-400 block">{c.label}</span>
+                    <span className={`text-[11px] font-semibold inline-block px-2 py-0.5 rounded-md border ${c.match ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-slate-50 border-slate-200 text-slate-400"} truncate max-w-full`}>
+                      {c.source}
+                    </span>
+                  </div>
+
+                  {/* Animated connecting line + match indicator */}
+                  <div className="flex-1 flex items-center justify-center relative min-w-[70px]">
+                    <svg className="w-full h-5 overflow-visible" viewBox="0 0 100 20" preserveAspectRatio="none">
+                      <motion.path
+                        d="M 2 10 C 30 10, 70 10, 98 10"
+                        fill="none"
+                        stroke={matchStyle.stroke}
+                        strokeWidth={c.match ? 2 : 1.2}
+                        strokeDasharray={c.match ? "none" : "5 4"}
+                        strokeLinecap="round"
+                        initial={{ pathLength: 0, opacity: 0 }}
+                        animate={{ pathLength: 1, opacity: 1 }}
+                        transition={{ delay: 0.2 + i * 0.12, duration: 0.5, ease: "easeOut" }}
+                      />
+                    </svg>
+                    <motion.span
+                      className={`absolute text-[8px] font-bold px-1.5 py-0.5 rounded-full border ${matchStyle.badge}`}
+                      initial={{ opacity: 0, scale: 0 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.5 + i * 0.12, duration: 0.25 }}
+                    >
+                      {c.match ? "✓" : "✗"}
+                    </motion.span>
+                  </div>
+
+                  {/* Target value */}
+                  <div className="w-[38%]">
+                    <span className="text-[9px] text-slate-400 block">{c.label}</span>
+                    <span className={`text-[11px] font-semibold inline-block px-2 py-0.5 rounded-md border ${c.match ? "bg-purple-50 border-purple-200 text-purple-700" : "bg-slate-50 border-slate-200 text-slate-400"} truncate max-w-full`}>
+                      {c.target}
+                    </span>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
 
