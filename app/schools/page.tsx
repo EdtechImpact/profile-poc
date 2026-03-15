@@ -14,6 +14,22 @@ interface Profile {
 
 type SortKey = "name-az" | "name-za" | "phase" | "region";
 
+function getPhaseGradient(phase: string): string {
+  const p = (phase || "").toLowerCase();
+  if (p.includes("primary")) return "from-blue-500 to-blue-600";
+  if (p.includes("secondary")) return "from-purple-500 to-purple-600";
+  if (p.includes("all-through") || p.includes("all through")) return "from-indigo-500 to-indigo-600";
+  return "from-slate-400 to-slate-500";
+}
+
+function getPhaseColor(phase: string): string {
+  const p = (phase || "").toLowerCase();
+  if (p.includes("primary")) return "bg-blue-50 text-blue-700 border-blue-100";
+  if (p.includes("secondary")) return "bg-purple-50 text-purple-700 border-purple-100";
+  if (p.includes("all-through") || p.includes("all through")) return "bg-indigo-50 text-indigo-700 border-indigo-100";
+  return "bg-slate-50 text-slate-600 border-slate-200";
+}
+
 export default function SchoolsPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,29 +122,36 @@ export default function SchoolsPage() {
     <div className="max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-xl font-semibold text-zinc-100 tracking-tight">Schools</h1>
-          <p className="text-zinc-500 text-sm mt-1">
-            <span className="text-brand-400 font-medium tabular-nums">{sorted.length}</span> school profiles
-            {profiles.length !== sorted.length ? (
-              <span className="text-zinc-600"> of {profiles.length}</span>
-            ) : null}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">Schools</h1>
+            <p className="text-slate-500 text-sm mt-0.5">
+              <span className="text-blue-600 font-bold tabular-nums">{sorted.length}</span> school profiles
+              {profiles.length !== sorted.length ? (
+                <span className="text-slate-400"> of {profiles.length}</span>
+              ) : null}
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Search & Filters */}
-      <div className="mb-6">
+      <div className="glass-card p-4 mb-6">
         <div className="relative mb-3">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>
           <input
             type="text"
-            placeholder="Search schools..."
+            placeholder="Search schools by name or URN..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500/40 focus:border-brand-500/40 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
           />
         </div>
         <div className="flex flex-wrap gap-2 items-center">
@@ -140,17 +163,20 @@ export default function SchoolsPage() {
           {hasFilters ? (
             <button
               onClick={() => setFilters({ phase: "", type: "", region: "", ofsted_rating: "", size_band: "" })}
-              className="text-[11px] text-zinc-500 hover:text-red-400 transition-colors flex items-center gap-1 px-2 py-1 rounded-md hover:bg-red-500/10"
+              className="text-xs text-slate-400 hover:text-red-500 transition-colors flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-50"
             >
-              Clear filters
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Clear
             </button>
           ) : null}
           <div className="ml-auto flex items-center gap-2">
-            <span className="text-[11px] text-zinc-600">Sort</span>
+            <span className="text-xs text-slate-400">Sort</span>
             <select
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as SortKey)}
-              className="px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-[11px] text-zinc-400 focus:outline-none focus:ring-1 focus:ring-brand-500/30 transition-all cursor-pointer hover:border-zinc-700"
+              className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer hover:border-gray-300"
             >
               <option value="name-az">Name A-Z</option>
               <option value="name-za">Name Z-A</option>
@@ -163,54 +189,64 @@ export default function SchoolsPage() {
 
       {/* Card Grid */}
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-zinc-600 gap-2">
-          <div className="w-4 h-4 border-2 border-brand-500/40 border-t-brand-400 rounded-full animate-spin" />
-          <span className="text-sm">Loading...</span>
+        <div className="flex items-center justify-center py-20 text-slate-400 gap-2">
+          <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">Loading schools...</span>
         </div>
       ) : sorted.length === 0 ? (
-        <div className="text-center py-20 text-zinc-600">
+        <div className="text-center py-20 text-slate-400">
           No schools found.{search ? " Try a different search." : ""}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {sorted.map((p) => {
             const sf = p.structured_fields;
+            const initial = p.entity_name.charAt(0).toUpperCase();
+            const gradient = getPhaseGradient(sf.phase);
             return (
               <Link
                 key={p.entity_id}
                 href={`/schools/${p.entity_id}`}
-                className="glass-card card-glow px-4 py-3.5 group relative"
+                className="bg-white border border-gray-200 rounded-xl overflow-hidden group hover:shadow-lg hover:shadow-blue-500/5 hover:border-gray-300 transition-all duration-300 hover:-translate-y-0.5"
               >
-                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-brand-500/0 via-brand-500/20 to-brand-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-medium text-zinc-200 truncate group-hover:text-brand-300 transition-colors">
-                      {p.entity_name}
+                {/* Gradient header with monogram */}
+                <div className={`h-24 bg-gradient-to-br ${gradient} relative flex items-center justify-center`}>
+                  <span className="text-4xl font-bold text-white/30 select-none">{initial}</span>
+                  {sf.ofsted_rating ? (
+                    <div className="absolute top-2.5 right-2.5">
+                      <OfstedBadge rating={sf.ofsted_rating} />
                     </div>
-                    <div className="text-[11px] text-zinc-600 mt-0.5 tabular-nums">URN {p.entity_id}</div>
-                  </div>
-                  <svg className="w-4 h-4 text-zinc-700 group-hover:text-zinc-500 transition-colors shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                  </svg>
+                  ) : null}
                 </div>
 
-                <div className="flex flex-wrap gap-1.5 mt-2.5">
-                  {sf.phase ? (
-                    <span className="px-1.5 py-0.5 bg-brand-500/10 text-brand-300 rounded text-[10px] font-medium">
-                      {sf.phase}
-                    </span>
-                  ) : null}
-                  {sf.type ? (
-                    <span className="px-1.5 py-0.5 bg-zinc-800 text-zinc-400 rounded text-[10px] font-medium">
-                      {sf.type}
-                    </span>
-                  ) : null}
-                  {sf.ofsted_rating ? <OfstedBadge rating={sf.ofsted_rating} /> : null}
+                {/* Content */}
+                <div className="p-4">
+                  <h3 className="text-sm font-semibold text-slate-800 truncate group-hover:text-blue-600 transition-colors">
+                    {p.entity_name}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5 tabular-nums">URN {p.entity_id}</p>
+
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {sf.phase ? (
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium border ${getPhaseColor(sf.phase)}`}>
+                        {sf.phase}
+                      </span>
+                    ) : null}
+                    {sf.type ? (
+                      <span className="px-2 py-0.5 bg-slate-50 text-slate-500 rounded-md text-[10px] font-medium border border-slate-200">
+                        {sf.type}
+                      </span>
+                    ) : null}
+                  </div>
+
                   {sf.region ? (
-                    <span className="px-1.5 py-0.5 bg-zinc-800/50 text-zinc-500 rounded text-[10px]">
+                    <div className="flex items-center gap-1 mt-2.5 text-[11px] text-slate-400">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0 1 15 0Z" />
+                      </svg>
                       {sf.region}
-                    </span>
+                    </div>
                   ) : null}
                 </div>
               </Link>
@@ -237,7 +273,7 @@ function FilterSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-[11px] text-zinc-400 focus:outline-none focus:ring-1 focus:ring-brand-500/30 transition-all cursor-pointer hover:border-zinc-700"
+      className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer hover:border-gray-300"
     >
       <option value="">All {label}</option>
       {options.map((o) => (
@@ -251,13 +287,13 @@ function FilterSelect({
 
 function OfstedBadge({ rating }: { rating: string }) {
   const colors: Record<string, string> = {
-    Outstanding: "bg-emerald-500/10 text-emerald-400",
-    Good: "bg-blue-500/10 text-blue-400",
-    "Requires Improvement": "bg-amber-500/10 text-amber-400",
-    Inadequate: "bg-red-500/10 text-red-400",
+    Outstanding: "bg-emerald-500 text-white",
+    Good: "bg-blue-500 text-white",
+    "Requires Improvement": "bg-amber-500 text-white",
+    Inadequate: "bg-red-500 text-white",
   };
   return (
-    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${colors[rating] || "bg-zinc-800 text-zinc-500"}`}>
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shadow-sm ${colors[rating] || "bg-slate-500 text-white"}`}>
       {rating}
     </span>
   );
