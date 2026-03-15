@@ -17,29 +17,9 @@
       "source": "ageRange",
       "extraction": "direct"
     },
-    "purchase_model": {
-      "type": "text",
-      "source": "purchaseModels",
-      "extraction": "direct"
-    },
     "key_features": {
       "type": "array",
       "source": "heroFeatures",
-      "extraction": "direct"
-    },
-    "num_of_reviews": {
-      "type": "number",
-      "source": "numOfReviews",
-      "extraction": "direct"
-    },
-    "user_rating": {
-      "type": "number",
-      "source": "userRating",
-      "extraction": "direct"
-    },
-    "organisation": {
-      "type": "text",
-      "source": "organisation",
       "extraction": "direct"
     },
     "pedagogy_style": {
@@ -54,7 +34,11 @@
     },
     "send_suitability": {
       "type": "enum",
-      "values": ["not designed for SEND", "some SEND features", "SEND focused"],
+      "values": [
+        "not designed for SEND",
+        "some SEND features",
+        "SEND focused"
+      ],
       "extraction": "llm",
       "prompt": "Based on the product's description, features, and category, assess its suitability for Special Educational Needs and Disabilities (SEND). Return one of: 'not designed for SEND', 'some SEND features', or 'SEND focused'."
     },

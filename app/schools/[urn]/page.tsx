@@ -71,6 +71,19 @@ const NODE_COLORS: Record<string, string> = {
   Trust: "#64748b",
 };
 
+const PHASE_THEME: Record<string, { accent: string; bg: string; light: string }> = {
+  Primary: { accent: "#3b82f6", bg: "bg-blue-500", light: "text-blue-600" },
+  Secondary: { accent: "#8b5cf6", bg: "bg-violet-500", light: "text-violet-600" },
+};
+
+function getPhaseTheme(phase: string) {
+  if (!phase) return { accent: "#64748b", bg: "bg-slate-500", light: "text-slate-600" };
+  for (const [key, val] of Object.entries(PHASE_THEME)) {
+    if (phase.toLowerCase().includes(key.toLowerCase())) return val;
+  }
+  return { accent: "#64748b", bg: "bg-slate-500", light: "text-slate-600" };
+}
+
 type TabKey = "profile" | "similar" | "recommendations" | "graph";
 
 export default function SchoolDetailPage({
@@ -83,7 +96,6 @@ export default function SchoolDetailPage({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
 
-  // Entity click state for DetailModal
   const [modalEntity, setModalEntity] = useState<{ type: "school" | "product"; id: string } | null>(null);
   const handleEntityClick: EntityClickHandler = useCallback((type, id) => {
     setModalEntity({ type, id });
@@ -113,10 +125,28 @@ export default function SchoolDetailPage({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="flex items-center gap-3 text-slate-400">
-          <div className="w-5 h-5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
-          Loading school profile...
+      <div className="max-w-7xl mx-auto">
+        <div className="animate-pulse">
+          <div className="h-4 bg-slate-200 rounded w-48 mb-6" />
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-6">
+            <div className="h-7 bg-slate-200 rounded w-2/3 mb-3" />
+            <div className="flex gap-2">
+              <div className="h-6 bg-slate-100 rounded-lg w-20" />
+              <div className="h-6 bg-slate-100 rounded-lg w-24" />
+              <div className="h-6 bg-slate-100 rounded-lg w-20" />
+            </div>
+          </div>
+          <div className="flex gap-1 mb-6">
+            {[1,2,3,4].map(i => <div key={i} className="h-9 bg-slate-100 rounded w-28" />)}
+          </div>
+          <div className="bg-white border border-gray-100 rounded-2xl p-6">
+            <div className="h-4 bg-slate-200 rounded w-32 mb-4" />
+            <div className="space-y-2">
+              <div className="h-3 bg-slate-100 rounded w-full" />
+              <div className="h-3 bg-slate-100 rounded w-5/6" />
+              <div className="h-3 bg-slate-100 rounded w-4/6" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -125,13 +155,19 @@ export default function SchoolDetailPage({
   if (!profile) {
     return (
       <div className="text-center py-20">
-        <div className="text-slate-400 mb-4">School profile not found for URN: {urn}</div>
-        <Link href="/schools" className="text-brand-600 hover:underline">Back to schools</Link>
+        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-7 h-7 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+        </div>
+        <p className="text-slate-500 text-sm mb-2">School profile not found for URN: {urn}</p>
+        <Link href="/schools" className="text-brand-600 hover:underline text-sm">Back to schools</Link>
       </div>
     );
   }
 
   const sf = profile.structured_fields as Record<string, string | string[]>;
+  const phaseTheme = getPhaseTheme(sf.phase as string);
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: "profile", label: "Profile" },
@@ -144,7 +180,7 @@ export default function SchoolDetailPage({
     <EntityClickContext.Provider value={handleEntityClick}>
       <div className="max-w-7xl mx-auto">
         {/* Breadcrumb */}
-        <div className="text-sm text-slate-400 mb-4 flex items-center gap-1.5 animate-fade-in">
+        <div className="text-sm text-slate-400 mb-4 flex items-center gap-1.5">
           <Link href="/schools" className="hover:text-brand-600 transition-colors">Schools</Link>
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -152,39 +188,54 @@ export default function SchoolDetailPage({
           <span className="text-slate-600 font-medium">{profile.entity_name}</span>
         </div>
 
-        {/* Header */}
-        <div className="glass-card p-6 mb-6 animate-fade-in-up relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-brand-500/5 to-transparent rounded-full -translate-y-1/2 translate-x-1/3" />
-          <div className="relative flex items-start justify-between">
-            <div>
-              <h1 className="text-2xl font-extrabold text-slate-800">{profile.entity_name}</h1>
-              <div className="flex gap-2 mt-3 flex-wrap">
-                <span className="px-2.5 py-1 bg-brand-50 text-brand-700 rounded-lg text-xs font-semibold border border-brand-100 shadow-sm">
-                  URN: {profile.entity_id}
-                </span>
-                {sf.phase ? (
-                  <span className="px-2.5 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-medium border border-slate-100">
-                    {sf.phase as string}
-                  </span>
-                ) : null}
-                {sf.type ? (
-                  <span className="px-2.5 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-medium border border-slate-100">
-                    {sf.type as string}
-                  </span>
-                ) : null}
-                {sf.ofsted_rating ? <OfstedBadge rating={sf.ofsted_rating as string} /> : null}
+        {/* Header Card */}
+        <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden mb-6 shadow-sm">
+          <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, ${phaseTheme.accent}, ${phaseTheme.accent}88, transparent)` }} />
+          <div className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-4">
+                <div
+                  className={`w-14 h-14 rounded-2xl ${phaseTheme.bg} flex items-center justify-center text-white font-bold text-xl shadow-lg shrink-0`}
+                  style={{ boxShadow: `0 4px 14px ${phaseTheme.accent}33` }}
+                >
+                  {profile.entity_name.charAt(0)}
+                </div>
+                <div>
+                  <h1 className="text-2xl font-extrabold text-slate-800">{profile.entity_name}</h1>
+                  <div className="flex gap-2 mt-2.5 flex-wrap">
+                    <span className="px-2.5 py-1 bg-brand-50 text-brand-700 rounded-lg text-xs font-semibold border border-brand-100">
+                      URN: {profile.entity_id}
+                    </span>
+                    {sf.phase ? (
+                      <span className="px-2.5 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-medium border border-slate-100">
+                        {sf.phase as string}
+                      </span>
+                    ) : null}
+                    {sf.type ? (
+                      <span className="px-2.5 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-medium border border-slate-100">
+                        {sf.type as string}
+                      </span>
+                    ) : null}
+                    {sf.ofsted_rating ? <OfstedBadge rating={sf.ofsted_rating as string} /> : null}
+                    {sf.region ? (
+                      <span className="px-2.5 py-1 bg-slate-50 text-slate-500 rounded-lg text-xs font-medium border border-slate-100">
+                        {sf.region as string}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <Link href={`/analyze?type=school&id=${urn}`} className="px-3 py-1.5 text-sm bg-brand-50 text-brand-700 border border-brand-200 rounded-xl hover:bg-brand-100 hover:shadow-sm transition-all font-medium">
-                AI Analysis
-              </Link>
-              <Link href={`/graph?type=school&id=${urn}`} className="px-3 py-1.5 text-sm bg-purple-50 text-purple-700 border border-purple-200 rounded-xl hover:bg-purple-100 hover:shadow-sm transition-all font-medium">
-                3D Graph
-              </Link>
-              <Link href={`/compare?type=school&ids=${urn}`} className="px-3 py-1.5 text-sm bg-slate-50 text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-100 hover:shadow-sm transition-all font-medium">
-                Compare
-              </Link>
+              <div className="flex gap-2 shrink-0">
+                <Link href={`/analyze?type=school&id=${urn}`} className="px-3 py-1.5 text-xs bg-brand-50 text-brand-700 border border-brand-200 rounded-xl hover:bg-brand-100 hover:shadow-sm transition-all font-medium">
+                  AI Analysis
+                </Link>
+                <Link href={`/graph?type=school&id=${urn}`} className="px-3 py-1.5 text-xs bg-purple-50 text-purple-700 border border-purple-200 rounded-xl hover:bg-purple-100 hover:shadow-sm transition-all font-medium">
+                  3D Graph
+                </Link>
+                <Link href={`/compare?type=school&ids=${urn}`} className="px-3 py-1.5 text-xs bg-slate-50 text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-100 hover:shadow-sm transition-all font-medium">
+                  Compare
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -218,7 +269,6 @@ export default function SchoolDetailPage({
         )}
       </div>
 
-      {/* Detail Modal */}
       {modalEntity ? (
         <DetailModal
           entityType={modalEntity.type}
@@ -230,13 +280,29 @@ export default function SchoolDetailPage({
   );
 }
 
+// ─── Score Bar ────────────────────────────────────────────────────────────────
+
+function ScoreBar({ value, color, label }: { value: number; color: string; label: string }) {
+  const pct = Math.round(value * 100);
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className={`w-2 h-2 rounded-full shrink-0 ${color}`} />
+      <span className="text-slate-400 w-16 shrink-0">{label}</span>
+      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="font-semibold text-slate-600 w-8 text-right tabular-nums">{pct}%</span>
+    </div>
+  );
+}
+
 // ─── Profile Tab ─────────────────────────────────────────────────────────────
 
 function ProfileTab({ profile, sf, keywords }: { profile: Profile; sf: Record<string, string | string[]>; keywords: string[] }) {
   return (
-    <div className="space-y-5 animate-fade-in-up">
+    <div className="space-y-5">
       {profile.profile_text ? (
-        <div className="glass-card p-6">
+        <div className="bg-white border border-gray-200/80 rounded-2xl p-6 shadow-sm">
           <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-brand-400" />
             Profile Summary
@@ -247,7 +313,7 @@ function ProfileTab({ profile, sf, keywords }: { profile: Profile; sf: Record<st
         </div>
       ) : null}
 
-      <div className="glass-card p-6">
+      <div className="bg-white border border-gray-200/80 rounded-2xl p-6 shadow-sm">
         <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
           Profile Fields
@@ -272,7 +338,7 @@ function ProfileTab({ profile, sf, keywords }: { profile: Profile; sf: Record<st
         </div>
       </div>
 
-      <div className="glass-card-static p-3 text-[11px] text-slate-400 flex items-center gap-2 animate-fade-in">
+      <div className="bg-white border border-gray-100 rounded-xl px-4 py-2.5 text-[11px] text-slate-400 flex items-center gap-2">
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
@@ -300,21 +366,42 @@ function SimilarTab({ urn, sourceFields }: { urn: string; sourceFields: Record<s
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="w-5 h-5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
+      <div className="space-y-3">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-slate-200" />
+              <div className="h-4 bg-slate-200 rounded w-48" />
+              <div className="ml-auto h-6 w-14 bg-slate-200 rounded-lg" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-2 bg-slate-100 rounded w-full" />
+              <div className="h-2 bg-slate-100 rounded w-3/4" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
 
   if (similar.length === 0) {
-    return <div className="glass-card p-6 text-sm text-slate-400 text-center">No similarity data computed yet.</div>;
+    return (
+      <div className="bg-white border border-gray-200/80 rounded-2xl p-8 text-center shadow-sm">
+        <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+          <svg className="w-5 h-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+          </svg>
+        </div>
+        <p className="text-sm text-slate-500">No similarity data computed yet.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4 animate-fade-in-up">
+    <div className="space-y-3">
       {similar.map((item, i) => {
         const score = Math.round(item.similarity_score * 100);
-        const scoreColor = score >= 75 ? "text-emerald-600 bg-emerald-50 border-emerald-200" : score >= 50 ? "text-amber-600 bg-amber-50 border-amber-200" : "text-red-500 bg-red-50 border-red-200";
+        const scoreColor = score >= 75 ? "text-emerald-600 bg-emerald-50 border-emerald-200" : score >= 50 ? "text-amber-600 bg-amber-50 border-amber-200" : "text-slate-500 bg-slate-50 border-slate-200";
 
         const matchingFields: string[] = [];
         const isf = item.structured_fields || {};
@@ -325,98 +412,72 @@ function SimilarTab({ urn, sourceFields }: { urn: string; sourceFields: Record<s
         if (isf.trust_name && isf.trust_name === sourceFields.trust_name) matchingFields.push("trust");
         if (isf.size_band && isf.size_band === sourceFields.size_band) matchingFields.push("size");
 
-        const radarDims = [
-          { label: "Structured", value: item.structured_score },
-          { label: "Embedding", value: item.embedding_score },
-          { label: "Graph", value: item.graph_score || 0 },
-        ];
-
         return (
-          <div key={item.entity_id} className="glass-card p-5 animate-fade-in-up" style={{ animationDelay: `${i * 0.05}s`, animationFillMode: "both" }}>
-            <div className="flex items-start gap-4">
-              {/* Rank */}
-              <div className="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center text-white text-sm font-bold shrink-0">
-                {i + 1}
+          <div key={item.entity_id} className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-gray-300 transition-all">
+            <div className="p-5">
+              {/* Top row: rank + name + score */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  {i + 1}
+                </div>
+                <SimilarSchoolClickable entityId={item.entity_id} name={item.entity_name} />
+                {isf.region ? (
+                  <span className="text-[11px] text-slate-400 hidden md:block">{isf.region}</span>
+                ) : null}
+                <span className={`ml-auto px-3 py-1 rounded-xl border text-sm font-extrabold shrink-0 ${scoreColor}`}>
+                  {score}%
+                </span>
               </div>
 
-              <div className="flex-1 min-w-0">
-                {/* Name + Score */}
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <SimilarSchoolClickable entityId={item.entity_id} name={item.entity_name} />
-                  <span className={`px-3 py-1.5 rounded-xl border text-sm font-extrabold shrink-0 ${scoreColor}`}>
-                    {score}%
-                  </span>
+              {/* Score bars */}
+              <div className="space-y-1.5 mb-4">
+                <ScoreBar value={item.structured_score} color="bg-blue-400" label="Structured" />
+                <ScoreBar value={item.embedding_score} color="bg-emerald-400" label="Embedding" />
+                <ScoreBar value={item.graph_score || 0} color="bg-purple-400" label="Graph" />
+              </div>
+
+              {/* Bottom row: matching fields + actions */}
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                <div className="flex flex-wrap gap-1.5">
+                  {matchingFields.length > 0 ? (
+                    matchingFields.map((f) => (
+                      <span key={f} className="px-2 py-0.5 bg-brand-50 text-brand-600 rounded-md text-[10px] font-semibold border border-brand-100 capitalize">{f}</span>
+                    ))
+                  ) : (
+                    <span className="text-[10px] text-slate-300">No field matches</span>
+                  )}
                 </div>
-
-                <div className="flex items-center gap-6">
-                  {/* Mini Radar */}
-                  <div className="shrink-0">
-                    <MiniRadar dimensions={radarDims} size={180} />
-                  </div>
-
-                  <div className="flex-1 min-w-0 space-y-2">
-                    {/* Score breakdown */}
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-                        <span className="text-slate-500">Structured</span>
-                        <span className="font-bold text-slate-700 ml-auto">{Math.round(item.structured_score * 100)}%</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                        <span className="text-slate-500">Embedding</span>
-                        <span className="font-bold text-slate-700 ml-auto">{Math.round(item.embedding_score * 100)}%</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
-                        <span className="text-slate-500">Graph</span>
-                        <span className="font-bold text-slate-700 ml-auto">{Math.round((item.graph_score || 0) * 100)}%</span>
-                      </div>
-                    </div>
-
-                    {/* Matching field badges */}
-                    {matchingFields.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {matchingFields.map((f) => (
-                          <span key={f} className="keyword-match text-[10px]">{f}</span>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
-                {/* Why similar expandable */}
-                {item.explanation ? (
-                  <div className="mt-3">
+                <div className="flex items-center gap-2">
+                  {item.explanation ? (
                     <button
                       onClick={() => setExpandedIdx(expandedIdx === i ? null : i)}
-                      className="text-[11px] text-brand-500 hover:text-brand-700 font-medium flex items-center gap-1"
+                      className="text-[11px] text-slate-400 hover:text-brand-600 font-medium flex items-center gap-1 transition-colors"
                     >
                       <svg className={`w-3 h-3 transition-transform ${expandedIdx === i ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                       </svg>
-                      Why similar?
+                      Why?
                     </button>
-                    {expandedIdx === i ? (
-                      <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed pl-4">{item.explanation}</p>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {/* Ask Advisor */}
-                <div className="mt-3">
+                  ) : null}
                   <button
                     onClick={() => {
                       window.dispatchEvent(new CustomEvent("open-advisor", {
                         detail: { query: `Tell me why school ${urn} is similar to ${item.entity_name} (${item.entity_id}) and what they can learn from each other` },
                       }));
                     }}
-                    className="text-[11px] px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-100 transition-all font-medium"
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-100 transition-all font-medium"
                   >
                     Ask Advisor
                   </button>
                 </div>
               </div>
+
+              {/* Expandable explanation */}
+              {expandedIdx === i && item.explanation ? (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <p className="text-xs text-slate-500 leading-relaxed">{item.explanation}</p>
+                </div>
+              ) : null}
             </div>
           </div>
         );
@@ -464,26 +525,47 @@ function RecommendationsTab({ urn }: { urn: string }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="w-5 h-5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
+      <div className="space-y-3">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-slate-200" />
+              <div className="h-4 bg-slate-200 rounded w-48" />
+              <div className="ml-auto h-6 w-14 bg-slate-200 rounded-lg" />
+            </div>
+            <div className="h-2.5 bg-slate-100 rounded w-full mb-3" />
+            <div className="flex gap-1.5">
+              <div className="h-5 bg-slate-100 rounded-md w-16" />
+              <div className="h-5 bg-slate-100 rounded-md w-12" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
 
   if (recs.length === 0) {
-    return <div className="glass-card p-6 text-sm text-slate-400 text-center">No recommendations available yet.</div>;
+    return (
+      <div className="bg-white border border-gray-200/80 rounded-2xl p-8 text-center shadow-sm">
+        <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+          <svg className="w-5 h-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+          </svg>
+        </div>
+        <p className="text-sm text-slate-500">No recommendations available yet.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4 animate-fade-in-up">
+    <div className="space-y-3">
       {recs.map((rec, i) => {
         const score = Math.round(rec.match_score * 100);
-        const scoreColor = score >= 70 ? "text-emerald-600 bg-emerald-50 border-emerald-200" : score >= 50 ? "text-amber-600 bg-amber-50 border-amber-200" : "text-red-500 bg-red-50 border-red-200";
+        const scoreColor = score >= 70 ? "text-emerald-600 bg-emerald-50 border-emerald-200" : score >= 50 ? "text-amber-600 bg-amber-50 border-amber-200" : "text-slate-500 bg-slate-50 border-slate-200";
         const breakdown = rec.score_breakdown;
         const sf = rec.structured_fields || {};
         const structBd = rec.structured_breakdown || {};
 
-        // Build radar dimensions from structured_breakdown
         const radarDims = Object.entries(CROSS_TYPE_DIMS).map(([key, label]) => ({
           label,
           value: structBd[key] != null ? Number(structBd[key]) : 0,
@@ -491,81 +573,60 @@ function RecommendationsTab({ urn }: { urn: string }) {
         const hasRadar = radarDims.some((d) => d.value > 0);
 
         return (
-          <div key={rec.entity_id} className="glass-card p-5 animate-fade-in-up" style={{ animationDelay: `${i * 0.05}s`, animationFillMode: "both" }}>
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center text-white text-sm font-bold shrink-0">
-                {i + 1}
+          <div key={rec.entity_id} className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-gray-300 transition-all">
+            <div className="p-5">
+              {/* Top row */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  {i + 1}
+                </div>
+                <RecProductClickable entityId={rec.entity_id} name={rec.entity_name} />
+                <span className={`ml-auto px-3 py-1 rounded-xl border text-sm font-extrabold shrink-0 ${scoreColor}`}>
+                  {score}%
+                </span>
               </div>
 
-              <div className="flex-1 min-w-0">
-                {/* Name + Score */}
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <RecProductClickable entityId={rec.entity_id} name={rec.entity_name} />
-                  <span className={`px-3 py-1.5 rounded-xl border text-sm font-extrabold shrink-0 ${scoreColor}`}>
-                    {score}%
-                  </span>
-                </div>
+              <div className="flex items-start gap-6">
+                {/* Radar chart - compact */}
+                {hasRadar ? (
+                  <div className="shrink-0">
+                    <MiniRadar dimensions={radarDims} size={140} />
+                  </div>
+                ) : null}
 
-                <div className="flex items-center gap-6">
-                  {/* Mini Radar for cross-type dimensions */}
-                  {hasRadar ? (
-                    <div className="shrink-0">
-                      <MiniRadar dimensions={radarDims} size={200} />
+                <div className="flex-1 min-w-0 space-y-3">
+                  {/* Score breakdown bars */}
+                  {breakdown ? (
+                    <div className="space-y-1.5">
+                      <ScoreBar value={breakdown.structured || 0} color="bg-blue-400" label="Structured" />
+                      <ScoreBar value={breakdown.embedding || 0} color="bg-emerald-400" label="Embedding" />
+                      <ScoreBar value={breakdown.graph || 0} color="bg-purple-400" label="Graph" />
                     </div>
                   ) : null}
 
-                  <div className="flex-1 min-w-0 space-y-3">
-                    {/* Score breakdown bar */}
-                    {breakdown ? (
-                      <div>
-                        <div className="flex w-full h-2.5 rounded-full overflow-hidden bg-slate-100">
-                          {(() => {
-                            const s = breakdown.structured || 0;
-                            const e = breakdown.embedding || 0;
-                            const g = breakdown.graph || 0;
-                            const total = s + e + g;
-                            if (total === 0) return null;
-                            return (
-                              <>
-                                <div className="h-full bg-blue-400" style={{ width: `${(s / total) * 100}%` }} title={`Structured: ${Math.round(s * 100)}%`} />
-                                <div className="h-full bg-emerald-400" style={{ width: `${(e / total) * 100}%` }} title={`Embedding: ${Math.round(e * 100)}%`} />
-                                <div className="h-full bg-purple-400" style={{ width: `${(g / total) * 100}%` }} title={`Graph: ${Math.round(g * 100)}%`} />
-                              </>
-                            );
-                          })()}
-                        </div>
-                        <div className="flex gap-3 mt-1 text-[10px] text-slate-400">
-                          <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 bg-blue-400 rounded-full inline-block" />{Math.round((breakdown.structured || 0) * 100)}%</span>
-                          <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block" />{Math.round((breakdown.embedding || 0) * 100)}%</span>
-                          <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 bg-purple-400 rounded-full inline-block" />{Math.round((breakdown.graph || 0) * 100)}%</span>
-                        </div>
-                      </div>
+                  {/* Product attributes */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {sf.pedagogy_style ? <span className="text-[10px] px-2 py-0.5 bg-violet-50 text-violet-600 rounded-md border border-violet-100 font-medium">{sf.pedagogy_style}</span> : null}
+                    {sf.send_suitability ? <span className="text-[10px] px-2 py-0.5 bg-teal-50 text-teal-600 rounded-md border border-teal-100 font-medium">{sf.send_suitability}</span> : null}
+                    {sf.target_school_type && Array.isArray(sf.target_school_type) ? (
+                      <span className="text-[10px] px-2 py-0.5 bg-slate-50 text-slate-500 rounded-md border border-slate-100 font-medium">{sf.target_school_type.length} school types</span>
                     ) : null}
-
-                    {/* Product attributes */}
-                    <div className="flex flex-wrap gap-1.5">
-                      {sf.primary_category ? <span className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100">{sf.primary_category}</span> : null}
-                      {sf.subjects && Array.isArray(sf.subjects) ? sf.subjects.slice(0, 3).map((s: string) => (
-                        <span key={s} className="text-[10px] px-2 py-0.5 bg-purple-50 text-purple-600 rounded-lg border border-purple-100">{s}</span>
-                      )) : null}
-                      {sf.age_range ? <span className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-600 rounded-lg border border-blue-100">Ages: {sf.age_range}</span> : null}
-                    </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Ask Advisor */}
-                <div className="mt-3">
-                  <button
-                    onClick={() => {
-                      window.dispatchEvent(new CustomEvent("open-advisor", {
-                        detail: { query: `Why is ${rec.entity_name} a good product recommendation for school ${urn}? Analyze the match in detail.` },
-                      }));
-                    }}
-                    className="text-[11px] px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-100 transition-all font-medium"
-                  >
-                    Ask Advisor
-                  </button>
-                </div>
+              {/* Bottom actions */}
+              <div className="flex items-center justify-end pt-3 mt-3 border-t border-gray-100">
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent("open-advisor", {
+                      detail: { query: `Why is ${rec.entity_name} a good product recommendation for school ${urn}? Analyze the match in detail.` },
+                    }));
+                  }}
+                  className="text-[11px] px-2.5 py-1 rounded-lg bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-100 transition-all font-medium"
+                >
+                  Ask Advisor
+                </button>
               </div>
             </div>
           </div>
@@ -665,7 +726,7 @@ function GraphTab({ urn, onEntityClick }: { urn: string; onEntityClick: EntityCl
   }
 
   return (
-    <div className="animate-fade-in-up">
+    <div>
       {/* Depth selector */}
       <div className="flex items-center gap-3 mb-4">
         <span className="text-xs font-semibold text-slate-500">Depth:</span>
@@ -685,9 +746,8 @@ function GraphTab({ urn, onEntityClick }: { urn: string; onEntityClick: EntityCl
         <span className="text-[10px] text-slate-400 ml-auto">{nodes.length} nodes, {links.length} links</span>
       </div>
 
-      {/* Graph */}
       {nodes.length > 0 ? (
-        <div className="glass-card overflow-hidden">
+        <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-sm">
           <ForceGraph2D
             ref={graphRef}
             graphData={{ nodes: [...nodes], links: [...links] }}
@@ -710,10 +770,11 @@ function GraphTab({ urn, onEntityClick }: { urn: string; onEntityClick: EntityCl
           />
         </div>
       ) : (
-        <div className="glass-card p-6 text-sm text-slate-400 text-center">No graph data available.</div>
+        <div className="bg-white border border-gray-200/80 rounded-2xl p-8 text-center shadow-sm">
+          <p className="text-sm text-slate-400">No graph data available.</p>
+        </div>
       )}
 
-      {/* Node type legend */}
       {types.length > 0 ? (
         <div className="flex flex-wrap gap-3 mt-4">
           {types.map((t) => (
@@ -751,10 +812,10 @@ function HighlightedText({ text, keywords }: { text: string; keywords: string[] 
 
 function OfstedBadge({ rating }: { rating: string }) {
   const colors: Record<string, string> = {
-    Outstanding: "bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm shadow-emerald-100",
-    Good: "bg-blue-50 text-blue-700 border-blue-200 shadow-sm shadow-blue-100",
-    "Requires Improvement": "bg-amber-50 text-amber-700 border-amber-200 shadow-sm shadow-amber-100",
-    Inadequate: "bg-red-50 text-red-700 border-red-200 shadow-sm shadow-red-100",
+    Outstanding: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    Good: "bg-blue-50 text-blue-700 border-blue-200",
+    "Requires Improvement": "bg-amber-50 text-amber-700 border-amber-200",
+    Inadequate: "bg-red-50 text-red-700 border-red-200",
   };
   return (
     <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${colors[rating] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
