@@ -67,7 +67,24 @@
       "type": "text",
       "extraction": "llm",
       "prompt": "Based on the product's category, features, and any alternatives listed, describe how this product positions itself in the market in 1-2 sentences. What differentiates it?"
+    },
+    "educational_impact": {
+      "type": "object",
+      "extraction": "imported",
+      "description": "Educational impact scores (0-100%) from EdTech Impact reviews",
+      "fields": {
+        "build_student_knowledge": "number",
+        "improve_attainment": "number",
+        "improve_teaching_efficiency": "number",
+        "reduce_teacher_workload": "number",
+        "improve_teacher_knowledge": "number"
+      }
+    },
+    "alternatives": {
+      "type": "array",
+      "extraction": "imported",
+      "description": "Product slugs of known alternatives from EdTech Impact"
     }
   },
-  "profile_text_template": "{entity_name} by {organisation}. Category: {primary_category}. Subjects: {subjects}. Age range: {age_range}. {value_proposition} Key features: {key_features}. Pedagogy: {pedagogy_style}. Rating: {user_rating}/10 ({num_of_reviews} reviews)."
+  "profile_text_template": "{entity_name} by {organisation}. Category: {primary_category}. Subjects: {subjects}. Age range: {age_range}. {value_proposition} Key features: {key_features}. Pedagogy: {pedagogy_style}. Rating: {user_rating}/10 ({num_of_reviews} reviews). Educational Impact: Student Knowledge {educational_impact.build_student_knowledge}%, Attainment {educational_impact.improve_attainment}%, Teaching Efficiency {educational_impact.improve_teaching_efficiency}%, Workload Reduction {educational_impact.reduce_teacher_workload}%, Teacher Knowledge {educational_impact.improve_teacher_knowledge}%."
 }

@@ -104,8 +104,9 @@ export async function syncSchoolToGraph(profile) {
 
 export async function syncProductToGraph(profile) {
   const fields = profile.structured_fields || {};
+  const impact = fields.educational_impact || {};
 
-  // Create/merge product node
+  // Create/merge product node (including impact scores)
   await runCypher(
     `MERGE (p:Product {slug: $slug})
      SET p.name = $name,
@@ -114,7 +115,12 @@ export async function syncProductToGraph(profile) {
          p.purchase_model = $purchase_model,
          p.pedagogy_style = $pedagogy_style,
          p.send_suitability = $send_suitability,
-         p.value_proposition = $value_proposition`,
+         p.value_proposition = $value_proposition,
+         p.impact_knowledge = $impact_knowledge,
+         p.impact_attainment = $impact_attainment,
+         p.impact_efficiency = $impact_efficiency,
+         p.impact_workload = $impact_workload,
+         p.impact_teacher_knowledge = $impact_teacher_knowledge`,
     {
       slug: profile.entity_id,
       name: profile.entity_name || "",
@@ -126,6 +132,11 @@ export async function syncProductToGraph(profile) {
       pedagogy_style: fields.pedagogy_style || "",
       send_suitability: fields.send_suitability || "",
       value_proposition: fields.value_proposition || "",
+      impact_knowledge: impact.build_student_knowledge || 0,
+      impact_attainment: impact.improve_attainment || 0,
+      impact_efficiency: impact.improve_teaching_efficiency || 0,
+      impact_workload: impact.reduce_teacher_workload || 0,
+      impact_teacher_knowledge: impact.improve_teacher_knowledge || 0,
     }
   );
 
@@ -149,6 +160,17 @@ export async function syncProductToGraph(profile) {
        MATCH (p:Product {slug: $slug})
        MERGE (p)-[:COVERS_SUBJECT]->(sub)`,
       { subject, slug: profile.entity_id }
+    );
+  }
+
+  // Connect to alternatives
+  const alternatives = fields.alternatives || [];
+  for (const altSlug of alternatives) {
+    await runCypher(
+      `MATCH (p:Product {slug: $slug})
+       MERGE (alt:Product {slug: $altSlug})
+       MERGE (p)-[:ALTERNATIVE_TO]->(alt)`,
+      { slug: profile.entity_id, altSlug }
     );
   }
 }
@@ -352,6 +374,33 @@ export async function findCrossTypeMatches(sourceType, sourceId, limit = 50) {
     entity_name: r.get("entity_name"),
     graph_score: Math.min(r.get("graph_score"), 1.0),
     shared_nodes: r.get("shared_nodes"),
+  }));
+}
+
+export async function getProductAlternatives(productSlug) {
+  const records = await runCypher(
+    `MATCH (p:Product {slug: $slug})-[:ALTERNATIVE_TO]-(alt:Product)
+     RETURN alt.slug AS entity_id, alt.name AS entity_name,
+            alt.primary_category AS category,
+            alt.impact_knowledge AS impact_knowledge,
+            alt.impact_attainment AS impact_attainment,
+            alt.impact_efficiency AS impact_efficiency,
+            alt.impact_workload AS impact_workload,
+            alt.impact_teacher_knowledge AS impact_teacher_knowledge`,
+    { slug: productSlug }
+  );
+
+  return records.map((r) => ({
+    entity_id: r.get("entity_id"),
+    entity_name: r.get("entity_name"),
+    category: r.get("category"),
+    impact: {
+      build_student_knowledge: r.get("impact_knowledge"),
+      improve_attainment: r.get("impact_attainment"),
+      improve_teaching_efficiency: r.get("impact_efficiency"),
+      reduce_teacher_workload: r.get("impact_workload"),
+      improve_teacher_knowledge: r.get("impact_teacher_knowledge"),
+    },
   }));
 }
 

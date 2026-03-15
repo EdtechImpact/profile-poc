@@ -7,6 +7,45 @@ import {
 } from "../lib/schema-manager.js";
 import { extractFieldsWithLLM, generateProfileText } from "../lib/llm.js";
 import { createEmbedding } from "../lib/embeddings.js";
+import { query } from "../lib/db.js";
+
+async function fetchImportedFields(entityId) {
+  const imported = {};
+
+  try {
+    // Fetch educational impact scores
+    const impactResult = await query(
+      `SELECT build_student_knowledge, improve_attainment, improve_teaching_efficiency,
+              reduce_teacher_workload, improve_teacher_knowledge
+       FROM raw_educational_impact WHERE product_id = $1`,
+      [entityId]
+    );
+    if (impactResult.rows.length > 0) {
+      const row = impactResult.rows[0];
+      imported.educational_impact = {
+        build_student_knowledge: row.build_student_knowledge ? Number(row.build_student_knowledge) : null,
+        improve_attainment: row.improve_attainment ? Number(row.improve_attainment) : null,
+        improve_teaching_efficiency: row.improve_teaching_efficiency ? Number(row.improve_teaching_efficiency) : null,
+        reduce_teacher_workload: row.reduce_teacher_workload ? Number(row.reduce_teacher_workload) : null,
+        improve_teacher_knowledge: row.improve_teacher_knowledge ? Number(row.improve_teacher_knowledge) : null,
+      };
+    }
+
+    // Fetch alternatives
+    const altResult = await query(
+      `SELECT alternative_product_id FROM raw_product_alternatives WHERE product_id = $1`,
+      [entityId]
+    );
+    if (altResult.rows.length > 0) {
+      imported.alternatives = altResult.rows.map(r => r.alternative_product_id);
+    }
+  } catch (e) {
+    // Tables may not exist yet — that's fine
+    console.log(`  Note: Could not fetch imported fields for ${entityId}: ${e.message}`);
+  }
+
+  return imported;
+}
 
 export async function generateProductProfile(rawProductData, { skipLLM = false } = {}) {
   const schema = loadSchema("product");
@@ -36,7 +75,10 @@ export async function generateProductProfile(rawProductData, { skipLLM = false }
     }
   }
 
-  const structuredFields = { ...directFields, ...computedFields, ...llmFields };
+  // 4. Imported fields (alternatives, educational impact)
+  const importedFields = await fetchImportedFields(entityId);
+
+  const structuredFields = { ...directFields, ...computedFields, ...llmFields, ...importedFields };
 
   // 4. Generate profile text
   let profileText = buildProfileTextFromTemplate(schema, entityName, structuredFields);

@@ -113,7 +113,7 @@ export async function findCrossTypeByEmbedding(targetType, embedding, limit = 50
 
 export async function getAllProfiles(entityType) {
   const result = await query(
-    "SELECT * FROM entity_profiles WHERE entity_type = $1 ORDER BY entity_name",
+    "SELECT id, entity_type, entity_id, entity_name, schema_version, structured_fields, profile_text, profiled_at FROM entity_profiles WHERE entity_type = $1 ORDER BY entity_name",
     [entityType]
   );
   return result.rows;
@@ -150,6 +150,110 @@ export async function upsertSimilarity(sim) {
     sim.graph_score,
     sim.explanation,
   ]);
+}
+
+// ============================================================
+// PRODUCT ALTERNATIVES & IMPACT QUERIES
+// ============================================================
+
+export async function getProductAlternatives(productId) {
+  const result = await query(
+    `SELECT rpa.alternative_product_id, ep.entity_name, ep.structured_fields
+     FROM raw_product_alternatives rpa
+     LEFT JOIN entity_profiles ep ON ep.entity_type = 'product' AND ep.entity_id = rpa.alternative_product_id
+     WHERE rpa.product_id = $1`,
+    [productId]
+  );
+  return result.rows;
+}
+
+export async function getEducationalImpact(productId) {
+  const result = await query(
+    `SELECT * FROM raw_educational_impact WHERE product_id = $1`,
+    [productId]
+  );
+  return result.rows[0] || null;
+}
+
+// ============================================================
+// CHAT THREAD & MESSAGE QUERIES
+// ============================================================
+
+export async function createThread(title, entityContext) {
+  const result = await query(
+    `INSERT INTO chat_threads (title, entity_context) VALUES ($1, $2) RETURNING *`,
+    [title, entityContext ? JSON.stringify(entityContext) : null]
+  );
+  return result.rows[0];
+}
+
+export async function getThread(threadId) {
+  const result = await query(
+    `SELECT t.*, (SELECT COUNT(*) FROM chat_messages WHERE thread_id = t.id) as message_count
+     FROM chat_threads t WHERE t.id = $1`,
+    [threadId]
+  );
+  return result.rows[0] || null;
+}
+
+export async function listThreads(limit = 20) {
+  const result = await query(
+    `SELECT t.*, (SELECT COUNT(*) FROM chat_messages WHERE thread_id = t.id) as message_count
+     FROM chat_threads t ORDER BY t.updated_at DESC LIMIT $1`,
+    [limit]
+  );
+  return result.rows;
+}
+
+export async function addMessage(threadId, role, content, toolCalls, toolResults, metadata) {
+  const result = await query(
+    `INSERT INTO chat_messages (thread_id, role, content, tool_calls, tool_results, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [
+      threadId,
+      role,
+      content,
+      toolCalls ? JSON.stringify(toolCalls) : null,
+      toolResults ? JSON.stringify(toolResults) : null,
+      metadata ? JSON.stringify(metadata) : null,
+    ]
+  );
+  // Update thread timestamp
+  await query(`UPDATE chat_threads SET updated_at = NOW() WHERE id = $1`, [threadId]);
+  return result.rows[0];
+}
+
+export async function getMessages(threadId) {
+  const result = await query(
+    `SELECT * FROM chat_messages WHERE thread_id = $1 ORDER BY created_at ASC`,
+    [threadId]
+  );
+  return result.rows;
+}
+
+export async function deleteThread(threadId) {
+  await query(`DELETE FROM chat_threads WHERE id = $1`, [threadId]);
+}
+
+export async function updateThreadTitle(threadId, title) {
+  await query(`UPDATE chat_threads SET title = $1, updated_at = NOW() WHERE id = $2`, [title, threadId]);
+}
+
+// ============================================================
+// MATCH REPORT QUERIES
+// ============================================================
+
+export async function saveMatchReport(threadId, schoolId, reportData) {
+  const result = await query(
+    `INSERT INTO match_reports (thread_id, school_id, report_data) VALUES ($1, $2, $3) RETURNING *`,
+    [threadId, schoolId, JSON.stringify(reportData)]
+  );
+  return result.rows[0];
+}
+
+export async function getMatchReport(reportId) {
+  const result = await query(`SELECT * FROM match_reports WHERE id = $1`, [reportId]);
+  return result.rows[0] || null;
 }
 
 export async function getSimilarEntities(entityType, entityId, limit = 10) {

@@ -12,12 +12,14 @@ const SCHOOL_WEIGHTS = {
 
 // Weights for product structured similarity
 const PRODUCT_WEIGHTS = {
-  primary_category: 0.30,
-  subjects: 0.25,
-  age_range: 0.20,
-  purchase_model: 0.10,
-  send_suitability: 0.10,
+  primary_category: 0.22,
+  subjects: 0.18,
+  age_range: 0.15,
+  purchase_model: 0.08,
+  send_suitability: 0.07,
   pedagogy_style: 0.05,
+  alternatives_overlap: 0.13,
+  impact_profile_similarity: 0.12,
 };
 
 function exactMatch(a, b) {
@@ -74,6 +76,51 @@ export function computeSchoolStructuredScore(fieldsA, fieldsB) {
   return { total, breakdown: scores };
 }
 
+function cosineOfVectors(a, b) {
+  if (!a || !b) return 0;
+  let dot = 0, magA = 0, magB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    magA += a[i] * a[i];
+    magB += b[i] * b[i];
+  }
+  if (magA === 0 || magB === 0) return 0;
+  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+}
+
+function impactProfileSimilarity(fieldsA, fieldsB) {
+  const impA = fieldsA.educational_impact;
+  const impB = fieldsB.educational_impact;
+  if (!impA || !impB) return 0;
+
+  const vecA = [
+    impA.build_student_knowledge || 0,
+    impA.improve_attainment || 0,
+    impA.improve_teaching_efficiency || 0,
+    impA.reduce_teacher_workload || 0,
+    impA.improve_teacher_knowledge || 0,
+  ];
+  const vecB = [
+    impB.build_student_knowledge || 0,
+    impB.improve_attainment || 0,
+    impB.improve_teaching_efficiency || 0,
+    impB.reduce_teacher_workload || 0,
+    impB.improve_teacher_knowledge || 0,
+  ];
+
+  // Skip if both vectors are all zeros
+  if (vecA.every(v => v === 0) && vecB.every(v => v === 0)) return 0;
+
+  return cosineOfVectors(vecA, vecB);
+}
+
+function alternativesOverlap(fieldsA, fieldsB) {
+  const altsA = fieldsA.alternatives || [];
+  const altsB = fieldsB.alternatives || [];
+  if (altsA.length === 0 && altsB.length === 0) return 0;
+  return arrayOverlap(altsA, altsB);
+}
+
 export function computeProductStructuredScore(fieldsA, fieldsB) {
   const scores = {};
 
@@ -83,6 +130,8 @@ export function computeProductStructuredScore(fieldsA, fieldsB) {
   scores.purchase_model = exactMatch(fieldsA.purchase_model, fieldsB.purchase_model);
   scores.send_suitability = exactMatch(fieldsA.send_suitability, fieldsB.send_suitability);
   scores.pedagogy_style = exactMatch(fieldsA.pedagogy_style, fieldsB.pedagogy_style);
+  scores.alternatives_overlap = alternativesOverlap(fieldsA, fieldsB);
+  scores.impact_profile_similarity = impactProfileSimilarity(fieldsA, fieldsB);
 
   let total = 0;
   for (const [key, weight] of Object.entries(PRODUCT_WEIGHTS)) {
